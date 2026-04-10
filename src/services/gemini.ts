@@ -64,12 +64,42 @@ export interface CostVsValue {
   comparison: string;
 }
 
+export interface ROIAnalysis {
+  estimatedMonthlySavings: number;
+  estimatedYearlySavings: number;
+  hoursSavedPerMonth: number;
+  paybackPeriodMonths: number;
+}
+
+export interface ZapierTemplate {
+  name: string;
+  url: string;
+  description: string;
+}
+
+export interface DiagramNode {
+  id: string;
+  label: string;
+  type: "trigger" | "action" | "ai" | "end";
+}
+
+export interface DiagramEdge {
+  from: string;
+  to: string;
+}
+
+export interface WorkflowDiagram {
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+}
+
 export interface AutomationReport {
   jobAnalysis: JobAnalysis;
   priorityScores: PriorityScore[];
   startHere: StartHere;
   impactEstimate: ImpactEstimate;
-  workflowIdeas: WorkflowIdea[];
+  roiAnalysis: ROIAnalysis;
+  workflowIdeas: (WorkflowIdea & { zapierTemplates: ZapierTemplate[]; diagram: WorkflowDiagram })[];
   systemMap: string[];
   aiRiskInsight: AIRiskInsight;
   roadmap: Roadmap;
@@ -87,7 +117,9 @@ export async function generateAutomationReport(userData: {
   industry: string;
   toolsUsed?: string;
   mostTimeConsumingTask?: string;
+  currencySymbol?: string;
 }): Promise<AutomationReport> {
+  const currency = userData.currencySymbol || "$";
   const prompt = `
     As an AI Workflow Architect, analyze the following job details and provide a comprehensive, practical, and actionable automation report.
     
@@ -96,46 +128,33 @@ export async function generateAutomationReport(userData: {
     - Industry: ${userData.industry}
     - Tools Currently Used (Optional): ${userData.toolsUsed || "Not specified, suggest common tools."}
     - Most Time-Consuming Task (Optional): ${userData.mostTimeConsumingTask || "Not specified."}
+    - Preferred Currency: ${currency}
     
     Your goal is to create a practical blueprint that makes the user say "I can actually start this today."
+    
+    IMPORTANT: All financial estimates, costs, and savings MUST be provided in the user's preferred currency (${currency}). If you need to convert from USD, use current approximate exchange rates.
     
     Follow this structure:
     1. JOB ANALYSIS: Daily Tasks and Common Tools.
     2. TASK BREAKDOWN: Automatable, AI-Enhanced, and Manual (Human-Centric) tasks.
     3. AUTOMATION PRIORITY SCORE: Rank tasks based on direct business impact (revenue/lost sales) and ease.
-       Clearly explain the DIRECT business impact for each task (e.g., "Every missed message = lost sale") and emphasize urgency where applicable.
-       Highest priority MUST reflect tasks that directly affect income, not just convenience.
     4. 🚀 START HERE: Recommend ONLY ONE workflow the user should begin with.
-       Explain:
-       - Why this is the best first step.
-       - What immediate result they will see.
-       This section must remove confusion and help the user take action immediately.
-    5. TIME SAVED + BUSINESS IMPACT: Estimate hours saved and business value.
-    6. WORKFLOWS: Create 2-4 detailed workflows with beginner and advanced steps.
-       For each workflow, include a "SIMPLE FLOW" section before the steps.
-       This must explain the workflow in plain, everyday language (e.g., "1. Customer sends message", "2. AI reads the message").
-       Avoid technical terms in this section.
-    7. AUTOMATION SYSTEM MAP: A simple, linear flow that prioritizes revenue-driving actions and the customer journey.
-       Example: "Customer Message → AI Analysis → Lead Capture → Notification → Follow-up → Sale"
-       Do NOT use generic labels like 'Input', 'Intelligence', or 'Output' as standalone steps.
-       Every step must name the actual tool or action from this user's report.
-       Provide this as a list of 4-6 steps that form a single linear revenue-driving chain.
-    7. AI RISK & COMPETITIVE INSIGHT: Explain why AI won't replace them, but how it helps competitors.
-    8. NEXT STEP ROADMAP: A 3-stage progression.
-    9. IMPORTANT LIMITATIONS: Costs, restrictions, and assumptions.
-    10. ESTIMATED MONTHLY COST: List each paid tool used in the workflows, its approximate monthly cost in USD, and a total range.
-        Format:
-        — [Tool Name]: $X/mo (reason: e.g. required for multi-step Zaps)
-        — [Tool Name]: $X–Y/mo (usage-based)
-        TOTAL ESTIMATE: $X–Y per month
-        If a tool has a free tier that covers the workflow described, mark it as "Free (free tier sufficient)".
-    11. 💰 COST VS VALUE: Explain the return on investment.
-        - What the user gains in time and revenue.
-        - Compare cost to potential return (e.g., "One extra sale per week can cover this cost").
-        Make the cost feel like an investment, not an expense.
-    12. PERSONALIZATION: If a most time-consuming task was provided, address it specifically.
-
-    Use simple, clear language. Avoid technical overwhelm.
+    5. ROI ANALYSIS: Provide numerical estimates for:
+       - estimatedMonthlySavings (Number, in ${currency})
+       - estimatedYearlySavings (Number, in ${currency})
+       - hoursSavedPerMonth (Number)
+       - paybackPeriodMonths (Number, usually 1-3)
+    6. WORKFLOWS: Create 2-4 detailed workflows. For each:
+       - Include a "zapierTemplates" array with 1-2 realistic Zapier template ideas (name, description, and a placeholder URL like "https://zapier.com/apps/google-sheets/integrations").
+       - Include a "diagram" object with "nodes" and "edges" to represent the flow visually.
+         - Nodes should have unique IDs and labels.
+         - Types: "trigger", "action", "ai", "end".
+    7. TIME SAVED + BUSINESS IMPACT: Estimate hours saved and business value.
+    8. AUTOMATION SYSTEM MAP: A simple, linear flow chain.
+    9. AI RISK & COMPETITIVE INSIGHT: Why AI won't replace them, but how it helps competitors.
+    10. NEXT STEP ROADMAP: A 3-stage progression.
+    11. ESTIMATED MONTHLY COST: List paid tools and costs.
+    12. 💰 COST VS VALUE: Explain the return on investment.
   `;
 
   const response = await ai.models.generateContent({
@@ -186,6 +205,16 @@ export async function generateAutomationReport(userData: {
             },
             required: ["hoursSavedPerWeek", "businessImpact"],
           },
+          roiAnalysis: {
+            type: Type.OBJECT,
+            properties: {
+              estimatedMonthlySavings: { type: Type.NUMBER },
+              estimatedYearlySavings: { type: Type.NUMBER },
+              hoursSavedPerMonth: { type: Type.NUMBER },
+              paybackPeriodMonths: { type: Type.NUMBER },
+            },
+            required: ["estimatedMonthlySavings", "estimatedYearlySavings", "hoursSavedPerMonth", "paybackPeriodMonths"],
+          },
           workflowIdeas: {
             type: Type.ARRAY,
             items: {
@@ -213,8 +242,49 @@ export async function generateAutomationReport(userData: {
                 advancedSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
                 aiRole: { type: Type.STRING },
                 successIndicator: { type: Type.STRING },
+                zapierTemplates: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      url: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                    },
+                    required: ["name", "url", "description"],
+                  },
+                },
+                diagram: {
+                  type: Type.OBJECT,
+                  properties: {
+                    nodes: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          id: { type: Type.STRING },
+                          label: { type: Type.STRING },
+                          type: { type: Type.STRING, enum: ["trigger", "action", "ai", "end"] },
+                        },
+                        required: ["id", "label", "type"],
+                      },
+                    },
+                    edges: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          from: { type: Type.STRING },
+                          to: { type: Type.STRING },
+                        },
+                        required: ["from", "to"],
+                      },
+                    },
+                  },
+                  required: ["nodes", "edges"],
+                },
               },
-              required: ["name", "description", "skillLevel", "setupTime", "toolsRequired", "limitations", "beginnerSteps", "aiRole", "successIndicator"],
+              required: ["name", "description", "skillLevel", "setupTime", "toolsRequired", "limitations", "beginnerSteps", "aiRole", "successIndicator", "zapierTemplates", "diagram"],
             },
           },
           systemMap: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -266,11 +336,17 @@ export async function generateAutomationReport(userData: {
             required: ["gains", "comparison"],
           },
         },
-        required: ["jobAnalysis", "priorityScores", "startHere", "impactEstimate", "workflowIdeas", "systemMap", "aiRiskInsight", "roadmap", "limitations", "estimatedMonthlyCost", "costVsValue"],
+        required: ["jobAnalysis", "priorityScores", "startHere", "impactEstimate", "roiAnalysis", "workflowIdeas", "systemMap", "aiRiskInsight", "roadmap", "limitations", "estimatedMonthlyCost", "costVsValue"],
       },
       systemInstruction: "You are an AI Workflow Architect. Your role is to help professionals analyze their job, find automation opportunities, and specifically design AI-powered workflows for Zapier. Your tone is professional, beginner-friendly, actionable, and encouraging.",
     },
   });
 
-  return JSON.parse(response.text || "{}");
+  try {
+    const text = response.text || "{}";
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse AI response:", e);
+    return {} as any;
+  }
 }
