@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: AI_Workflow_Architect
+    // Document ID: auto-generated
+    // Fields:
+    //   - role: string (required, size < 100) - The job role provided by the user.
+    //   - industry: string (required, size < 100) - The industry provided by the user.
+    //   - tools: string (optional, size < 500) - The tools provided by the user.
+    //   - repetitive_tasks: string (optional, size < 1000) - The most time-consuming task provided by the user.
+    //   - generated_report: map (required, size < 100000) - The complete generated automation report object.
+    //   - timestamp: timestamp (required) - The time the report was generated.
+    //   - uid: string (required) - The ID of the user who generated the report.
+    //   - user_email: string (required, size < 255) - The email of the authenticated user.
+    //   - user_name: string (optional, size < 255) - The display name of the authenticated user.
+    //   - user_id: string (required) - The UID of the authenticated user.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, maxLen) {
+      return !(field in request.resource.data) || 
+             (request.resource.data[field] == null) ||
+             (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidReportSubmission(data) {
+      return data.keys().hasAll(['role', 'industry', 'generated_report', 'timestamp', 'uid', 'user_email', 'user_id']) &&
+        isValidStringLength('role', 1, 100) &&
+        isValidStringLength('industry', 1, 100) &&
+        isValidOptionalString('tools', 500) &&
+        isValidOptionalString('repetitive_tasks', 1000) &&
+        data.generated_report is map &&
+        data.timestamp is timestamp &&
+        data.uid == request.auth.uid &&
+        data.user_id == request.auth.uid &&
+        data.user_email == request.auth.token.email &&
+        isValidEmail(data.user_email) &&
+        isValidOptionalString('user_name', 255);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /AI_Workflow_Architect/{submissionId} {
+      // Allow users to read their own submissions
+      allow read: if isOwner(resource.data.uid);
+      
+      // Allow authenticated users to create their own submissions
+      allow create: if isAuthenticated() && isValidReportSubmission(request.resource.data);
+      
+      // Deny updates and deletes
+      allow update, delete: if false;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
