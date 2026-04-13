@@ -3,8 +3,19 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User 
 import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, getDocs } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with environment variable for API Key
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY?.trim();
+
+if (!firebaseApiKey) {
+  console.warn("VITE_FIREBASE_API_KEY is missing. Please add it to your Secrets in AI Studio.");
+} else {
+  console.log("Firebase initialized with key starting with: " + firebaseApiKey.substring(0, 7) + "...");
+}
+
+const app = initializeApp({
+  ...firebaseConfig,
+  apiKey: firebaseApiKey
+});
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();

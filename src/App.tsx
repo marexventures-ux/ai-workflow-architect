@@ -138,12 +138,35 @@ function ROICalculator({ roi, hourlyRate, setHourlyRate, currencySymbol, setCurr
           </div>
         </div>
       </div>
+
+      <div className="mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-700 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <Sparkles className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h4 className="font-bold dark:text-white">Ready to implement these automations?</h4>
+            <p className="text-xs text-neutral-500">Don't let these savings stay on paper. Get expert help today.</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => {
+            const element = document.getElementById('next-steps');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="w-full sm:w-auto px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 group"
+        >
+          Get Started
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </button>
+      </div>
     </div>
   );
 }
 
 export default function App() {
   const [loading, setLoading] = React.useState(false);
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [report, setReport] = React.useState<AutomationReport | null>(null);
@@ -163,6 +186,10 @@ export default function App() {
   });
 
   React.useEffect(() => {
+    if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+      setError("Configuration Error: VITE_FIREBASE_API_KEY is missing from Secrets. Please add it in the Settings menu.");
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
@@ -187,6 +214,8 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
@@ -195,12 +224,16 @@ export default function App() {
       if (err.code === 'auth/popup-closed-by-user') {
         setError("The sign-in window was closed before completion. Please try again and complete the sign-in process.");
       } else if (err.code === 'auth/cancelled-popup-request') {
-        setError("Sign-in request was cancelled. Please try again.");
+        setError("A sign-in request was already in progress. Please wait a moment and try again.");
       } else if (err.code === 'auth/popup-blocked') {
         setError("The sign-in popup was blocked by your browser. Please allow popups for this site.");
+      } else if (err.message && (err.message.includes('identitytoolkit') || err.code === 'auth/internal-error')) {
+        setError("Firebase Configuration Error: The Identity Toolkit API is blocked. Please ensure: 1. 'Identity Toolkit API' AND 'Firebase Management API' are enabled in Google Cloud. 2. This app's domain is in 'Authorized Domains' in Firebase Console. 3. Your API key has no 'Application restrictions' (Referrer/IP).");
       } else {
-        setError("Failed to sign in with Google. Please ensure your Firebase configuration is correct and try again.");
+        setError("Failed to sign in with Google. Please ensure your Firebase configuration and VITE_FIREBASE_API_KEY secret are correct.");
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -258,28 +291,138 @@ export default function App() {
 
   const downloadPDF = async () => {
     if (!report) return;
-    const element = document.getElementById('report-content');
-    if (!element) return;
-
     setLoading(true);
     try {
-      const canvas = await domToCanvas(element, {
-        scale: 2,
-        backgroundColor: darkMode ? "#171717" : "#ffffff",
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      let y = margin;
+
+      // Helper for new page
+      const checkNewPage = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+          return true;
+        }
+        return false;
+      };
+
+      // Header
+      doc.setFillColor(16, 185, 129); // Emerald 500
+      doc.rect(0, 0, pageWidth, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text("AI WORKFLOW BLUEPRINT", margin, 25);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated for: ${formData.jobRole} | ${formData.industry}`, margin, 32);
+      y = 55;
+
+      // Section Title Helper
+      const sectionTitle = (title: string) => {
+        checkNewPage(20);
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(title.toUpperCase(), margin, y);
+        y += 8;
+        doc.setDrawColor(240, 240, 240);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+      };
+
+      // 1. Executive Summary
+      sectionTitle("1. Executive Summary");
+      doc.setTextColor(64, 64, 64);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const summary = `This report outlines a strategic automation roadmap for a ${formData.jobRole} in the ${formData.industry} industry. By implementing the recommended AI-powered workflows, you can save approximately ${report.roiAnalysis.hoursSavedPerMonth} hours per month, resulting in an estimated yearly value of ${currencySymbol}${report.roiAnalysis.estimatedYearlySavings.toLocaleString()}.`;
+      const splitSummary = doc.splitTextToSize(summary, contentWidth);
+      doc.text(splitSummary, margin, y);
+      y += (splitSummary.length * 5) + 15;
+
+      // 2. ROI Analysis
+      sectionTitle("2. ROI Analysis");
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'F');
+      doc.setTextColor(16, 185, 129);
+      doc.setFontSize(12);
+      doc.text(`${currencySymbol}${report.roiAnalysis.estimatedMonthlySavings.toLocaleString()}`, margin + 10, y + 12);
+      doc.text(`${report.roiAnalysis.hoursSavedPerMonth} Hours`, margin + contentWidth/2 + 10, y + 12);
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(8);
+      doc.text("ESTIMATED MONTHLY SAVINGS", margin + 10, y + 20);
+      doc.text("HOURS SAVED PER MONTH", margin + contentWidth/2 + 10, y + 20);
+      y += 45;
+
+      // 3. Automation Priority
+      sectionTitle("3. Automation Priority Score");
+      report.priorityScores.forEach((item) => {
+        checkNewPage(15);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text(item.task, margin, y);
+        doc.setTextColor(16, 185, 129);
+        doc.text(item.score, pageWidth - margin - 40, y);
+        y += 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        const reason = doc.splitTextToSize(item.reason, contentWidth);
+        doc.text(reason, margin, y);
+        y += (reason.length * 5) + 8;
       });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`AI_Workflow_Report_${formData.jobRole.replace(/\s+/g, '_')}.pdf`);
-      setSuccessMessage("PDF Report downloaded successfully!");
+
+      // 4. Workflows
+      sectionTitle("4. Recommended Workflows");
+      report.workflowIdeas.forEach((wf, i) => {
+        checkNewPage(60);
+        doc.setFillColor(252, 252, 252);
+        doc.rect(margin - 2, y - 5, contentWidth + 4, 5, 'F');
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${i + 1}. ${wf.name}`, margin, y);
+        y += 8;
+        doc.setTextColor(64, 64, 64);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const desc = doc.splitTextToSize(wf.description, contentWidth);
+        doc.text(desc, margin, y);
+        y += (desc.length * 5) + 8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.text("Implementation Steps:", margin, y);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        wf.beginnerSteps.forEach((step, si) => {
+          checkNewPage(10);
+          doc.text(`${si + 1}. ${step}`, margin + 5, y);
+          y += 5;
+        });
+        y += 10;
+      });
+
+      // Footer on every page
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`AI Workflow Architect | Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      doc.save(`AI_Workflow_Report_${formData.jobRole.replace(/\s+/g, '_')}.pdf`);
+      setSuccessMessage("Professional PDF Report downloaded successfully!");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error("PDF generation error:", err);
-      setError("Failed to generate PDF. Please try the text download instead.");
+      setError("Failed to generate professional PDF. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -658,10 +801,15 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                   <button
                     type="button"
                     onClick={handleLogin}
-                    className="w-full bg-neutral-900 hover:bg-neutral-800 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-neutral-900/20"
+                    disabled={isLoggingIn}
+                    className="w-full bg-neutral-900 hover:bg-neutral-800 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-neutral-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Shield className="w-5 h-5" />
-                    Sign In to Generate Plan
+                    {isLoggingIn ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Shield className="w-5 h-5" />
+                    )}
+                    {isLoggingIn ? "Connecting..." : "Sign In to Generate Plan"}
                   </button>
                 ) : (
                   <button
@@ -1325,7 +1473,7 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                   </section>
 
                   {/* CTA Section */}
-                  <section className="mt-12 pb-24">
+                  <section id="next-steps" className="mt-12 pb-24">
                     <div className="bg-emerald-600 text-white p-12 rounded-[3rem] shadow-2xl relative overflow-hidden text-center">
                       <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                         <div className="absolute -top-24 -left-24 w-96 h-96 bg-white rounded-full blur-3xl" />

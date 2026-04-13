@@ -157,196 +157,209 @@ export async function generateAutomationReport(userData: {
     12. 💰 COST VS VALUE: Explain the return on investment.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      jobAnalysis: {
         type: Type.OBJECT,
         properties: {
-          jobAnalysis: {
-            type: Type.OBJECT,
-            properties: {
-              dailyTasks: { type: Type.ARRAY, items: { type: Type.STRING } },
-              toolsUsed: { type: Type.ARRAY, items: { type: Type.STRING } },
-              tasksAutomated: { type: Type.ARRAY, items: { type: Type.STRING } },
-              tasksAI: { type: Type.ARRAY, items: { type: Type.STRING } },
-              tasksManual: { type: Type.ARRAY, items: { type: Type.STRING } },
-            },
-            required: ["dailyTasks", "toolsUsed", "tasksAutomated", "tasksAI", "tasksManual"],
+          dailyTasks: { type: Type.ARRAY, items: { type: Type.STRING } },
+          toolsUsed: { type: Type.ARRAY, items: { type: Type.STRING } },
+          tasksAutomated: { type: Type.ARRAY, items: { type: Type.STRING } },
+          tasksAI: { type: Type.ARRAY, items: { type: Type.STRING } },
+          tasksManual: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["dailyTasks", "toolsUsed", "tasksAutomated", "tasksAI", "tasksManual"],
+      },
+      priorityScores: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            task: { type: Type.STRING },
+            score: { type: Type.STRING, enum: ["High Priority ⭐⭐⭐⭐⭐", "Medium ⭐⭐⭐", "Low ⭐⭐"] },
+            reason: { type: Type.STRING },
           },
-          priorityScores: {
+          required: ["task", "score", "reason"],
+        },
+      },
+      startHere: {
+        type: Type.OBJECT,
+        properties: {
+          workflowName: { type: Type.STRING },
+          whyFirstStep: { type: Type.STRING },
+          immediateResult: { type: Type.STRING },
+        },
+        required: ["workflowName", "whyFirstStep", "immediateResult"],
+      },
+      impactEstimate: {
+        type: Type.OBJECT,
+        properties: {
+          hoursSavedPerWeek: { type: Type.STRING },
+          businessImpact: { type: Type.STRING },
+        },
+        required: ["hoursSavedPerWeek", "businessImpact"],
+      },
+      roiAnalysis: {
+        type: Type.OBJECT,
+        properties: {
+          estimatedMonthlySavings: { type: Type.NUMBER },
+          estimatedYearlySavings: { type: Type.NUMBER },
+          hoursSavedPerMonth: { type: Type.NUMBER },
+          paybackPeriodMonths: { type: Type.NUMBER },
+        },
+        required: ["estimatedMonthlySavings", "estimatedYearlySavings", "hoursSavedPerMonth", "paybackPeriodMonths"],
+      },
+      workflowIdeas: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            description: { type: Type.STRING },
+            skillLevel: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
+            setupTime: { type: Type.STRING },
+            toolsRequired: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  type: { type: Type.STRING, enum: ["Free", "Paid"] },
+                  alternative: { type: Type.STRING },
+                },
+                required: ["name", "type"],
+              },
+            },
+            limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            simpleFlow: { type: Type.ARRAY, items: { type: Type.STRING } },
+            beginnerSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+            advancedSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+            aiRole: { type: Type.STRING },
+            successIndicator: { type: Type.STRING },
+            zapierTemplates: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  url: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                },
+                required: ["name", "url", "description"],
+              },
+            },
+            diagram: {
+              type: Type.OBJECT,
+              properties: {
+                nodes: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      label: { type: Type.STRING },
+                      type: { type: Type.STRING, enum: ["trigger", "action", "ai", "end"] },
+                    },
+                    required: ["id", "label", "type"],
+                  },
+                },
+                edges: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      from: { type: Type.STRING },
+                      to: { type: Type.STRING },
+                    },
+                    required: ["from", "to"],
+                  },
+                },
+              },
+              required: ["nodes", "edges"],
+            },
+          },
+          required: ["name", "description", "skillLevel", "setupTime", "toolsRequired", "limitations", "beginnerSteps", "aiRole", "successIndicator", "zapierTemplates", "diagram"],
+        },
+      },
+      systemMap: { type: Type.ARRAY, items: { type: Type.STRING } },
+      aiRiskInsight: {
+        type: Type.OBJECT,
+        properties: {
+          whyNotReplace: { type: Type.STRING },
+          competitorAdvantage: { type: Type.STRING },
+          doingNothingRisk: { type: Type.STRING },
+        },
+        required: ["whyNotReplace", "competitorAdvantage", "doingNothingRisk"],
+      },
+      roadmap: {
+        type: Type.OBJECT,
+        properties: {
+          stage1: { type: Type.STRING },
+          stage2: { type: Type.STRING },
+          stage3: { type: Type.STRING },
+        },
+        required: ["stage1", "stage2", "stage3"],
+      },
+      limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+      personalizationNote: { type: Type.STRING },
+      estimatedMonthlyCost: {
+        type: Type.OBJECT,
+        properties: {
+          items: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                task: { type: Type.STRING },
-                score: { type: Type.STRING, enum: ["High Priority ⭐⭐⭐⭐⭐", "Medium ⭐⭐⭐", "Low ⭐⭐"] },
+                toolName: { type: Type.STRING },
+                cost: { type: Type.STRING },
                 reason: { type: Type.STRING },
               },
-              required: ["task", "score", "reason"],
+              required: ["toolName", "cost", "reason"],
             },
           },
-          startHere: {
-            type: Type.OBJECT,
-            properties: {
-              workflowName: { type: Type.STRING },
-              whyFirstStep: { type: Type.STRING },
-              immediateResult: { type: Type.STRING },
-            },
-            required: ["workflowName", "whyFirstStep", "immediateResult"],
-          },
-          impactEstimate: {
-            type: Type.OBJECT,
-            properties: {
-              hoursSavedPerWeek: { type: Type.STRING },
-              businessImpact: { type: Type.STRING },
-            },
-            required: ["hoursSavedPerWeek", "businessImpact"],
-          },
-          roiAnalysis: {
-            type: Type.OBJECT,
-            properties: {
-              estimatedMonthlySavings: { type: Type.NUMBER },
-              estimatedYearlySavings: { type: Type.NUMBER },
-              hoursSavedPerMonth: { type: Type.NUMBER },
-              paybackPeriodMonths: { type: Type.NUMBER },
-            },
-            required: ["estimatedMonthlySavings", "estimatedYearlySavings", "hoursSavedPerMonth", "paybackPeriodMonths"],
-          },
-          workflowIdeas: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                skillLevel: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
-                setupTime: { type: Type.STRING },
-                toolsRequired: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      type: { type: Type.STRING, enum: ["Free", "Paid"] },
-                      alternative: { type: Type.STRING },
-                    },
-                    required: ["name", "type"],
-                  },
-                },
-                limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
-                simpleFlow: { type: Type.ARRAY, items: { type: Type.STRING } },
-                beginnerSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-                advancedSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-                aiRole: { type: Type.STRING },
-                successIndicator: { type: Type.STRING },
-                zapierTemplates: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      url: { type: Type.STRING },
-                      description: { type: Type.STRING },
-                    },
-                    required: ["name", "url", "description"],
-                  },
-                },
-                diagram: {
-                  type: Type.OBJECT,
-                  properties: {
-                    nodes: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          id: { type: Type.STRING },
-                          label: { type: Type.STRING },
-                          type: { type: Type.STRING, enum: ["trigger", "action", "ai", "end"] },
-                        },
-                        required: ["id", "label", "type"],
-                      },
-                    },
-                    edges: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          from: { type: Type.STRING },
-                          to: { type: Type.STRING },
-                        },
-                        required: ["from", "to"],
-                      },
-                    },
-                  },
-                  required: ["nodes", "edges"],
-                },
-              },
-              required: ["name", "description", "skillLevel", "setupTime", "toolsRequired", "limitations", "beginnerSteps", "aiRole", "successIndicator", "zapierTemplates", "diagram"],
-            },
-          },
-          systemMap: { type: Type.ARRAY, items: { type: Type.STRING } },
-          aiRiskInsight: {
-            type: Type.OBJECT,
-            properties: {
-              whyNotReplace: { type: Type.STRING },
-              competitorAdvantage: { type: Type.STRING },
-              doingNothingRisk: { type: Type.STRING },
-            },
-            required: ["whyNotReplace", "competitorAdvantage", "doingNothingRisk"],
-          },
-          roadmap: {
-            type: Type.OBJECT,
-            properties: {
-              stage1: { type: Type.STRING },
-              stage2: { type: Type.STRING },
-              stage3: { type: Type.STRING },
-            },
-            required: ["stage1", "stage2", "stage3"],
-          },
-          limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          personalizationNote: { type: Type.STRING },
-          estimatedMonthlyCost: {
-            type: Type.OBJECT,
-            properties: {
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    toolName: { type: Type.STRING },
-                    cost: { type: Type.STRING },
-                    reason: { type: Type.STRING },
-                  },
-                  required: ["toolName", "cost", "reason"],
-                },
-              },
-              totalEstimate: { type: Type.STRING },
-            },
-            required: ["items", "totalEstimate"],
-          },
-          costVsValue: {
-            type: Type.OBJECT,
-            properties: {
-              gains: { type: Type.STRING },
-              comparison: { type: Type.STRING },
-            },
-            required: ["gains", "comparison"],
-          },
+          totalEstimate: { type: Type.STRING },
         },
-        required: ["jobAnalysis", "priorityScores", "startHere", "impactEstimate", "roiAnalysis", "workflowIdeas", "systemMap", "aiRiskInsight", "roadmap", "limitations", "estimatedMonthlyCost", "costVsValue"],
+        required: ["items", "totalEstimate"],
       },
-      systemInstruction: "You are an AI Workflow Architect. Your role is to help professionals analyze their job, find automation opportunities, and specifically design AI-powered workflows for Zapier. Your tone is professional, beginner-friendly, actionable, and encouraging.",
+      costVsValue: {
+        type: Type.OBJECT,
+        properties: {
+          gains: { type: Type.STRING },
+          comparison: { type: Type.STRING },
+        },
+        required: ["gains", "comparison"],
+      },
     },
-  });
+    required: ["jobAnalysis", "priorityScores", "startHere", "impactEstimate", "roiAnalysis", "workflowIdeas", "systemMap", "aiRiskInsight", "roadmap", "limitations", "estimatedMonthlyCost", "costVsValue"],
+  };
 
-  try {
-    const text = response.text || "{}";
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("Failed to parse AI response:", e);
-    return {} as any;
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: responseSchema,
+          systemInstruction: "You are an AI Workflow Architect. Your role is to help professionals analyze their job, find automation opportunities, and specifically design AI-powered workflows for Zapier. Your tone is professional, beginner-friendly, actionable, and encouraging. You MUST return a valid JSON object matching the requested schema.",
+        },
+      });
+
+      const text = response.text?.trim() || "{}";
+      if (text === "{}") throw new Error("Empty AI response");
+      
+      return JSON.parse(text);
+    } catch (e) {
+      console.error(`Attempt ${attempt} failed:`, e);
+      lastError = e;
+      if (attempt < 3) {
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
   }
+
+  throw lastError || new Error("Failed to generate report after 3 attempts");
 }
