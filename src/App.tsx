@@ -23,6 +23,7 @@ import {
   Clock,
   DollarSign,
   AlertCircle,
+  ShieldAlert,
   Target,
   Flag,
   ArrowDown,
@@ -83,70 +84,238 @@ function WorkflowDiagram({ diagram }: { diagram: any }) {
   );
 }
 
-function ROICalculator({ roi, hourlyRate, setHourlyRate, currencySymbol, setCurrencySymbol }: { 
+function ROICalculator({ 
+  roi, 
+  hourlyRate, 
+  setHourlyRate, 
+  currencySymbol, 
+  setCurrencySymbol,
+  calcMode,
+  setCalcMode,
+  monthlySalary,
+  setMonthlySalary
+}: { 
   roi: any, 
   hourlyRate: number, 
   setHourlyRate: (val: number) => void,
   currencySymbol: string,
-  setCurrencySymbol: (val: string) => void
+  setCurrencySymbol: (val: string) => void,
+  calcMode: 'hourly' | 'monthly',
+  setCalcMode: (mode: 'hourly' | 'monthly') => void,
+  monthlySalary: number,
+  setMonthlySalary: (val: number) => void
 }) {
-  const monthlyValue = (roi.hoursSavedPerMonth * hourlyRate) + (roi.estimatedMonthlySavings || 0);
-  
+  const [showMath, setShowMath] = React.useState(false);
+  const effectiveHourlyRate = calcMode === 'hourly' ? hourlyRate : (monthlySalary / 160);
+  const laborValue = roi.hoursSavedPerMonth * effectiveHourlyRate;
+  const directValue = roi.directExpensesSavings || 0;
+  const monthlyValue = laborValue + directValue;
+  const timeRecoveredPercent = Math.min(100, Math.round((roi.hoursSavedPerMonth / 160) * 100));
+  const extraDaysPerMonth = (roi.hoursSavedPerMonth / 8).toFixed(1);
+
+  const commonCurrencies = [
+    { label: "Naira", symbol: "₦" },
+    { label: "Dollar", symbol: "$" },
+    { label: "Pound", symbol: "£" },
+    { label: "Euro", symbol: "€" }
+  ];
+
   return (
-    <div className="bg-white dark:bg-neutral-800 p-8 rounded-3xl border border-neutral-200 dark:border-neutral-700 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
-          <Calculator className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <h3 className="text-xl font-bold tracking-tight dark:text-white">Interactive ROI Calculator</h3>
+    <div className="bg-white dark:bg-neutral-800 p-8 rounded-[2rem] border-2 border-emerald-500/20 dark:border-emerald-500/10 shadow-xl overflow-hidden relative">
+      <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+        <TrendingUp className="w-48 h-48" />
       </div>
-      
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-1 space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Currency</label>
-              <input 
-                type="text" 
-                value={currencySymbol} 
-                onChange={(e) => setCurrencySymbol(e.target.value)}
-                placeholder="$"
-                className="w-full px-4 py-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-center font-bold dark:text-white outline-none focus:border-emerald-500"
-              />
+
+      <div className="relative z-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <div className="bg-emerald-500 p-3 rounded-2xl shadow-lg shadow-emerald-500/20">
+              <Calculator className="w-6 h-6 text-white" />
             </div>
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Hourly Rate</label>
-              <input 
-                type="number" 
-                value={hourlyRate} 
-                onChange={(e) => setHourlyRate(Number(e.target.value))}
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-neutral-950 border-2 border-neutral-300 dark:border-neutral-600 text-xl font-black text-black dark:text-white outline-none focus:border-emerald-500 transition-all shadow-inner"
-              />
+            <div>
+              <h3 className="text-2xl font-black tracking-tight dark:text-white">ROI Value Blueprint</h3>
+              <p className="text-sm text-neutral-500">Calculate the actual financial impact of your time.</p>
             </div>
           </div>
-          <p className="text-xs text-neutral-500 italic">Adjust these to see your personalized savings in your local currency.</p>
+
+          <div className="flex bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl">
+            <button 
+              onClick={() => setCalcMode('hourly')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${calcMode === 'hourly' ? 'bg-white dark:bg-neutral-800 text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
+            >
+              Hourly Rate
+            </button>
+            <button 
+              onClick={() => setCalcMode('monthly')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${calcMode === 'monthly' ? 'bg-white dark:bg-neutral-800 text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'}`}
+            >
+              Monthly Salary
+            </button>
+          </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Monthly Value</p>
-            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{currencySymbol}{monthlyValue.toLocaleString()}</p>
+        <div className="grid lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-12">
+            <label className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 block text-center lg:text-left">1. Select Your Currency</label>
+            <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+              {commonCurrencies.map((c) => (
+                <button
+                  key={c.symbol}
+                  onClick={() => setCurrencySymbol(c.symbol)}
+                  className={`px-6 py-4 rounded-2xl border-2 transition-all flex items-center gap-3 group ${
+                    currencySymbol === c.symbol 
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-md' 
+                    : 'border-neutral-200 dark:border-neutral-700 hover:border-emerald-300 dark:hover:border-emerald-800 text-neutral-600 dark:text-neutral-400'
+                  }`}
+                >
+                  <span className="text-2xl font-black">{c.symbol}</span>
+                  <span className="font-bold">{c.label}</span>
+                </button>
+              ))}
+              <div className="relative group">
+                <input 
+                  type="text" 
+                  value={commonCurrencies.some(c => c.symbol === currencySymbol) ? "" : currencySymbol} 
+                  onChange={(e) => setCurrencySymbol(e.target.value)}
+                  placeholder="Other"
+                  className="w-24 px-4 py-4 rounded-2xl border-2 border-neutral-200 dark:border-neutral-700 bg-transparent text-center font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                />
+              </div>
+            </div>
           </div>
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-1">Yearly Value</p>
-            <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{currencySymbol}{(monthlyValue * 12).toLocaleString()}</p>
+
+          <div className="lg:col-span-5 space-y-8">
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-neutral-400">
+                2. Enter Your {calcMode === 'hourly' ? 'Hourly Rate' : 'Monthly Salary'}
+              </label>
+              <div className="relative">
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-neutral-300">{currencySymbol}</div>
+                <input 
+                  type="number" 
+                  value={calcMode === 'hourly' ? hourlyRate : monthlySalary} 
+                  onChange={(e) => calcMode === 'hourly' ? setHourlyRate(Number(e.target.value)) : setMonthlySalary(Number(e.target.value))}
+                  className="w-full pl-14 pr-6 py-6 rounded-3xl bg-neutral-50 dark:bg-neutral-900 border-2 border-neutral-200 dark:border-neutral-700 text-4xl font-black text-black dark:text-white outline-none focus:border-emerald-500 transition-all shadow-inner"
+                />
+              </div>
+              <p className="text-xs text-neutral-500 italic">
+                {calcMode === 'hourly' 
+                  ? "Based on what you charge or earn per hour of work." 
+                  : "Based on your total fixed monthly take-home pay."}
+              </p>
+            </div>
           </div>
+
+          <div className="lg:col-span-7">
+            <div className="grid grid-cols-2 gap-4 h-full">
+              <div className="p-6 bg-emerald-500 rounded-[2rem] text-white shadow-lg shadow-emerald-500/30 flex flex-col justify-center relative group">
+                <button 
+                  onClick={() => setShowMath(!showMath)}
+                  className="absolute top-4 right-4 text-[9px] uppercase font-black bg-white/20 px-2 py-1 rounded-lg hover:bg-white/30 transition-all"
+                >
+                  {showMath ? "Hide Math" : "Show Math"}
+                </button>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-100 mb-2">Estimated Monthly Value</p>
+                <p className="text-4xl font-black mb-1">~{currencySymbol}{Math.round(monthlyValue).toLocaleString()}</p>
+                
+                {showMath && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-3 pt-2 border-t border-white/20 flex flex-col gap-1"
+                  >
+                    <div className="flex justify-between text-[10px] items-center">
+                      <span className="opacity-70">Labor Savings:</span>
+                      <span className="font-bold">~{roi.hoursSavedPerMonth}h × {currencySymbol}{Math.round(effectiveHourlyRate)}/h</span>
+                    </div>
+                    {directValue > 0 && (
+                      <div className="flex justify-between text-[10px] items-center">
+                        <span className="opacity-70">Tools/Expense:</span>
+                        <span className="font-bold">{currencySymbol}{directValue.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-[9px] mt-1 p-2 bg-white/10 rounded italic opacity-90 border border-white/5">
+                      <span>{roi.calculationLogic}</span>
+                    </div>
+                    <div className="text-[8px] uppercase tracking-tighter opacity-50 mt-1">Values are strategic estimates based on typical labor productivity.</div>
+                  </motion.div>
+                )}
+
+                <div className="flex items-center gap-2 text-[10px] font-bold bg-white/20 w-fit px-2 py-1 rounded-full uppercase">
+                  <ArrowRight className="w-3 h-3" />
+                  {currencySymbol}{Math.round(monthlyValue * 12).toLocaleString()} / Year
+                </div>
+              </div>
+
+              <div className="grid grid-rows-3 gap-2">
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
+                  <Clock className="absolute -bottom-2 -right-2 w-12 h-12 opacity-5 rotate-12 group-hover:scale-110 transition-transform" />
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 mb-0.5">Time Reclaimed</p>
+                  <p className="text-xl font-black text-neutral-900 dark:text-white">~{timeRecoveredPercent}%</p>
+                  <p className="text-[9px] text-neutral-500 leading-tight">monthly recovery</p>
+                </div>
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
+                  <TrendingUp className="absolute -bottom-2 -right-2 w-12 h-12 opacity-10 -rotate-12 group-hover:scale-110 transition-transform" />
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-0.5">Payback Period</p>
+                  <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">{roi.paybackPeriod}</p>
+                </div>
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
+                  <Target className="absolute -bottom-2 -right-2 w-12 h-12 opacity-5 -rotate-12 group-hover:scale-110 transition-transform" />
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 mb-0.5">Productivity Bonus</p>
+                  <p className="text-xl font-black text-neutral-900 dark:text-white">~{extraDaysPerMonth} Days</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-12">
+            <div className="p-6 bg-neutral-50 dark:bg-neutral-900/50 rounded-3xl border border-neutral-200 dark:border-neutral-700">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-6 flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-emerald-500" /> 
+                Estimated Time Savings Breakdown
+              </h4>
+              <div className="grid md:grid-cols-2 gap-x-12 gap-y-4">
+                {roi.breakdown?.map((item: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between gap-4 py-2 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300 truncate">{item.taskName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{item.hoursSaved}h</span>
+                      <span className="text-[10px] text-neutral-400">/mo</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-2xl border border-emerald-200/50 dark:border-emerald-800/50 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Lightbulb className="w-12 h-12 text-emerald-600" />
+          </div>
+          <h4 className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4" />
+            What does this mean?
+          </h4>
+          <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80 leading-relaxed">
+            By automating these tasks, you aren't just saving time—you're <strong>buying back your life.</strong> 
+            {calcMode === 'monthly' 
+              ? ` Since you earn a fixed salary, you're essentially getting one week's worth of free time every month to focus on promotion-earning projects or your side business.` 
+              : ` Every hour automated is money earned back into your pocket. This system pays for itself in value almost immediately.`}
+          </p>
         </div>
       </div>
 
-      <div className="mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-700 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div className="mt-10 pt-10 border-t border-neutral-100 dark:border-neutral-700 flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/20 group hover:rotate-12 transition-transform">
+            <Zap className="w-7 h-7 text-white fill-current" />
           </div>
           <div>
-            <h4 className="font-bold dark:text-white">Ready to implement these automations?</h4>
-            <p className="text-xs text-neutral-500">Don't let these savings stay on paper. Get expert help today.</p>
+            <h4 className="text-lg font-black dark:text-white">Ready to reclaim your time?</h4>
+            <p className="text-xs text-neutral-500 font-medium tracking-wide">Take the first step toward working 100% smarter.</p>
           </div>
         </div>
         <button 
@@ -154,10 +323,10 @@ function ROICalculator({ roi, hourlyRate, setHourlyRate, currencySymbol, setCurr
             const element = document.getElementById('next-steps');
             element?.scrollIntoView({ behavior: 'smooth' });
           }}
-          className="w-full sm:w-auto px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 group"
+          className="w-full sm:w-auto px-10 py-4 bg-neutral-900 hover:bg-neutral-800 text-white font-black rounded-2xl transition-all shadow-2xl flex items-center justify-center gap-3 group active:scale-95"
         >
-          Get Started
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          Implement Now
+          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
         </button>
       </div>
     </div>
@@ -177,10 +346,13 @@ export default function App() {
   const [history, setHistory] = React.useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = React.useState(false);
   const [hourlyRate, setHourlyRate] = React.useState(50);
-  const [currencySymbol, setCurrencySymbol] = React.useState("$");
+  const [monthlySalary, setMonthlySalary] = React.useState(250000);
+  const [calcMode, setCalcMode] = React.useState<'hourly' | 'monthly'>('monthly');
+  const [currencySymbol, setCurrencySymbol] = React.useState("₦");
   const [formData, setFormData] = React.useState({
     jobRole: "",
     industry: "",
+    workDescription: "",
     toolsUsed: "",
     mostTimeConsumingTask: "",
   });
@@ -255,7 +427,13 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const result = await generateAutomationReport({ ...formData, currencySymbol });
+      const result = await generateAutomationReport({ 
+        ...formData, 
+        currencySymbol,
+        monthlySalary,
+        hourlyRate,
+        calcMode
+      });
       setReport(result);
 
       // Save to Firestore
@@ -264,6 +442,7 @@ export default function App() {
         await addDoc(collection(db, path), {
           role: formData.jobRole,
           industry: formData.industry,
+          work_description: formData.workDescription || null,
           tools: formData.toolsUsed || null,
           repetitive_tasks: formData.mostTimeConsumingTask || null,
           generated_report: result,
@@ -314,12 +493,14 @@ export default function App() {
       doc.setFillColor(16, 185, 129); // Emerald 500
       doc.rect(0, 0, pageWidth, 40, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text("AI WORKFLOW BLUEPRINT", margin, 25);
+      doc.text("STRATEGIC AI IMPLEMENTATION BLUEPRINT", margin, 20);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Generated for: ${formData.jobRole} | ${formData.industry}`, margin, 32);
+      doc.text("EXECUTIVE CONSULTING DELIVERABLE", margin, 28);
+      doc.setFontSize(9);
+      doc.text(`Prepared for: ${formData.jobRole} | ${formData.industry}`, margin, 34);
       y = 55;
 
       // Section Title Helper
@@ -340,7 +521,7 @@ export default function App() {
       doc.setTextColor(64, 64, 64);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      const summary = `This report outlines a strategic automation roadmap for a ${formData.jobRole} in the ${formData.industry} industry. By implementing the recommended AI-powered workflows, you can save approximately ${report.roiAnalysis.hoursSavedPerMonth} hours per month, resulting in an estimated yearly value of ${currencySymbol}${report.roiAnalysis.estimatedYearlySavings.toLocaleString()}.`;
+      const summary = `This report outlines a strategic automation roadmap for a ${formData.jobRole} in the ${formData.industry} industry. By implementing the recommended AI-powered workflows, you can save approximately ${report.roiAnalysis.hoursSavedPerMonth} hours per month, resulting in an estimated yearly value of ${currencySymbol}${Math.round(currentMonthlyValue * 12).toLocaleString()}.`;
       const splitSummary = doc.splitTextToSize(summary, contentWidth);
       doc.text(splitSummary, margin, y);
       y += (splitSummary.length * 5) + 15;
@@ -348,16 +529,23 @@ export default function App() {
       // 2. ROI Analysis
       sectionTitle("2. ROI Analysis");
       doc.setFillColor(249, 250, 251);
-      doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'F');
+      doc.roundedRect(margin, y, contentWidth, 35, 3, 3, 'F');
       doc.setTextColor(16, 185, 129);
       doc.setFontSize(12);
-      doc.text(`${currencySymbol}${report.roiAnalysis.estimatedMonthlySavings.toLocaleString()}`, margin + 10, y + 12);
+      doc.text(`${currencySymbol}${Math.round(currentMonthlyValue).toLocaleString()}`, margin + 10, y + 12);
       doc.text(`${report.roiAnalysis.hoursSavedPerMonth} Hours`, margin + contentWidth/2 + 10, y + 12);
+      
       doc.setTextColor(100, 100, 100);
       doc.setFontSize(8);
-      doc.text("ESTIMATED MONTHLY SAVINGS", margin + 10, y + 20);
+      doc.text("ESTIMATED MONTHLY VALUE", margin + 10, y + 20);
       doc.text("HOURS SAVED PER MONTH", margin + contentWidth/2 + 10, y + 20);
-      y += 45;
+
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Logic: ${report.roiAnalysis.calculationLogic}`, margin + 10, y + 28);
+      doc.text(`Estimated Payback: ${report.roiAnalysis.paybackPeriod}`, margin + contentWidth/2 + 10, y + 28);
+
+      y += 50;
 
       // 3. Automation Priority
       sectionTitle("3. Automation Priority Score");
@@ -378,35 +566,140 @@ export default function App() {
         y += (reason.length * 5) + 8;
       });
 
-      // 4. Workflows
-      sectionTitle("4. Recommended Workflows");
+      // 4. Workflows (DEEP BLUEPRINTS)
+      sectionTitle("4. Implementation Blueprints");
       report.workflowIdeas.forEach((wf, i) => {
-        checkNewPage(60);
-        doc.setFillColor(252, 252, 252);
-        doc.rect(margin - 2, y - 5, contentWidth + 4, 5, 'F');
-        doc.setTextColor(16, 185, 129);
-        doc.setFontSize(12);
+        checkNewPage(120);
+        
+        // Workflow Header Box
+        doc.setFillColor(30, 30, 30);
+        doc.roundedRect(margin, y, contentWidth, 20, 3, 3, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${i + 1}. ${wf.name}`, margin, y);
-        y += 8;
-        doc.setTextColor(64, 64, 64);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        const desc = doc.splitTextToSize(wf.description, contentWidth);
-        doc.text(desc, margin, y);
-        y += (desc.length * 5) + 8;
+        doc.text(`BLUEPRINT #${i + 1}: ${wf.name}`, margin + 5, y + 13);
+        y += 28;
 
-        doc.setFont('helvetica', 'bold');
-        doc.text("Implementation Steps:", margin, y);
+        // Skill level & time
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(10);
+        doc.text(`Skill Level: ${wf.skillLevel || "N/A"} (${wf.skillLevelExplanation || ""})`, margin, y);
         y += 6;
-        doc.setFont('helvetica', 'normal');
-        wf.beginnerSteps.forEach((step, si) => {
-          checkNewPage(10);
-          doc.text(`${si + 1}. ${step}`, margin + 5, y);
+        if (wf.setupTimeBreakdown) {
+          const timeArr = wf.setupTimeBreakdown.map(b => `${b.phase}: ${b.duration}`);
+          doc.text(`Setup Breakdown: ${timeArr.join(' | ')}`, margin, y);
+          y += 12;
+        } else {
+          doc.text(`Estimated Setup: ${wf.setupTime || "Varies"}`, margin, y);
+          y += 12;
+        }
+
+        // 4.1 Architecture
+        if (wf.architecture) {
+          doc.setTextColor(40, 40, 40);
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.text("1. ARCHITECTURE", margin, y);
+          y += 6;
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Trigger: ${wf.architecture.trigger}`, margin + 5, y);
+          y += 5;
+          doc.text(`Data Source: ${wf.architecture.inputData}`, margin + 5, y);
+          y += 5;
+          doc.text(`Output: ${wf.architecture.output} (Target: ${wf.architecture.storage})`, margin + 5, y);
+          y += 10;
+        }
+
+        // 4.2 Implementation
+        if (wf.implementationSteps) {
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.text("2. IMPLEMENTATION STEPS", margin, y);
+          y += 6;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          wf.implementationSteps.forEach((step, si) => {
+            checkNewPage(10);
+            const sText = doc.splitTextToSize(`[ ] Step ${si + 1}: ${step}`, contentWidth - 10);
+            doc.text(sText, margin + 5, y);
+            y += (sText.length * 5);
+          });
+          y += 8;
+        }
+
+        // 4.3 Prompt Logic
+        if (wf.promptLogic) {
+          checkNewPage(40);
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.text("3. CRITICAL PROMPT LOGIC", margin, y);
+          y += 7;
+          doc.setFillColor(245, 247, 250);
+          const promptText = doc.splitTextToSize(`"${wf.promptLogic.examplePrompt}"`, contentWidth - 10);
+          doc.rect(margin, y - 4, contentWidth, (promptText.length * 5) + 8, 'F');
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8);
+          doc.text(promptText, margin + 5, y + 2);
+          y += (promptText.length * 5) + 10;
+        }
+
+        // 4.4 Human Review & Failure
+        if (wf.humanReviewPoints || wf.failureHandling) {
+          checkNewPage(40);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text("Human Review Protocol:", margin, y);
+          y += 6;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          (wf.humanReviewPoints || []).forEach(p => {
+            doc.text(`• ${p}`, margin + 5, y);
+            y += 5;
+          });
+          y += 5;
+          
+          if (wf.failureHandling) {
+            doc.setFont('helvetica', 'bold');
+            doc.text("Failure Handling:", margin, y);
+            y += 6;
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Common Errors: ${(wf.failureHandling.commonErrors || []).join(', ')}`, margin + 5, y);
+            y += 5;
+            doc.text(`Recovery: ${wf.failureHandling.correctionSteps}`, margin + 5, y);
+            y += 15;
+          }
+        }
+      });
+
+      // 5. Estimated Costs
+      if (report.estimatedMonthlyCost) {
+        sectionTitle("5. Estimated Monthly Cost");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Overall Setup Level: ${report.estimatedMonthlyCost.overallCostTier}`, margin, y);
+        y += 10;
+  
+        (report.estimatedMonthlyCost.items || []).forEach((item) => {
+          checkNewPage(15);
+          doc.setFillColor(249, 250, 251);
+          doc.roundedRect(margin, y, contentWidth, 12, 2, 2, 'F');
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(30, 30, 30);
+          doc.text(item.toolName, margin + 5, y + 8);
+          
+          doc.setTextColor(16, 185, 129);
+          doc.text(item.costRange, pageWidth - margin - 5, y + 8, { align: 'right' });
+          y += 15;
+          
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.setTextColor(120, 120, 120);
+          doc.text(`(${item.costTier}) - ${item.reason}`, margin + 5, y - 5);
           y += 5;
         });
-        y += 10;
-      });
+      }
 
       // Footer on every page
       const pageCount = (doc as any).internal.getNumberOfPages();
@@ -414,10 +707,16 @@ export default function App() {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(`AI Workflow Architect | Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.text(`STRATEGIC AI BLUEPRINT | Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        if (i === pageCount) {
+          doc.setFontSize(7);
+          const disclaimer = "CONFIDENTIAL CONSULTING DOCUMENT: The recommendations and ROI calculations within this blueprint are strategic estimates based on typical labor productivity indices. Actual performance may vary based on specific implementation quality and organizational adoption rates. This document is intended as an implementation roadmap, not a financial guarantee.";
+          const discLines = doc.splitTextToSize(disclaimer, contentWidth);
+          doc.text(discLines, margin, pageHeight - 20);
+        }
       }
 
-      doc.save(`AI_Workflow_Report_${formData.jobRole.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`Strategic_AI_Blueprint_${formData.jobRole.replace(/\s+/g, '_')}.pdf`);
       setSuccessMessage("Professional PDF Report downloaded successfully!");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -428,6 +727,11 @@ export default function App() {
     }
   };
 
+  const effectiveHourlyRate = calcMode === 'hourly' ? hourlyRate : (monthlySalary / 160);
+  const currentMonthlyValue = report 
+    ? (report.roiAnalysis.hoursSavedPerMonth * effectiveHourlyRate) + (report.roiAnalysis.directExpensesSavings || 0)
+    : 0;
+
   const emailReport = () => {
     if (!report || !user) return;
     
@@ -436,7 +740,9 @@ export default function App() {
 Hi, here is your AI Workflow Blueprint for ${formData.jobRole}.
 
 HOURS SAVED PER MONTH: ${report.roiAnalysis.hoursSavedPerMonth}
-ESTIMATED YEARLY SAVINGS: ${currencySymbol}${report.roiAnalysis.estimatedYearlySavings}
+ESTIMATED MONTHLY VALUE: ${currencySymbol}${Math.round(currentMonthlyValue).toLocaleString()}
+ESTIMATED PAYBACK PERIOD: ${report.roiAnalysis.paybackPeriod}
+LOGIC: ${report.roiAnalysis.calculationLogic}
 
 View the full report in the AI Workflow Architect app.
     `.trim());
@@ -450,9 +756,9 @@ View the full report in the AI Workflow Architect app.
     if (!report) return;
 
     const content = `
-AI WORKFLOW ARCHITECT REPORT
-==========================
-Role: ${formData.jobRole}
+STRATEGIC AI IMPLEMENTATION BLUEPRINT: EXECUTIVE CONSULTING DELIVERABLE
+======================================================================
+Prepared for: ${formData.jobRole}
 Industry: ${formData.industry}
 ${formData.mostTimeConsumingTask ? `Most Time-Consuming Task: ${formData.mostTimeConsumingTask}` : ""}
 
@@ -471,54 +777,72 @@ Manual: ${report.jobAnalysis.tasksManual.join(', ')}
 
 3. ROI ANALYSIS
 ---------------
-Estimated Monthly Savings: ${currencySymbol}${report.roiAnalysis.estimatedMonthlySavings}
-Estimated Yearly Savings: ${currencySymbol}${report.roiAnalysis.estimatedYearlySavings}
+Estimated Monthly Value: ${currencySymbol}${Math.round(currentMonthlyValue)}
 Hours Saved Per Month: ${report.roiAnalysis.hoursSavedPerMonth}
-Payback Period: ${report.roiAnalysis.paybackPeriodMonths} months
+Logic: ${report.roiAnalysis.calculationLogic}
+Payback Period: ${report.roiAnalysis.paybackPeriod}
 
 4. AUTOMATION PRIORITY SCORE
 ---------------------------
-${report.priorityScores?.map(p => `${p.score} - ${p.task}\nReason: ${p.reason}`).join('\n\n')}
+${report.priorityScores ? `4. AUTOMATION PRIORITY SCORE
+---------------------------
+${report.priorityScores.map(p => `${p.score} - ${p.task}\nReason: ${p.reason}`).join('\n\n')}\n` : ""}
 
-5. 🚀 START HERE
----------------
-Recommended Workflow: ${report.startHere.workflowName}
-Why this is the best first step: ${report.startHere.whyFirstStep}
-Immediate result: ${report.startHere.immediateResult}
+5. RECOMMENDED FIRST STEP
+-------------------------
+Workflow: ${report.startHere.workflowName}
+Rationale: ${report.startHere.whyFirstStep}
+Expected Result: ${report.startHere.immediateResult}
 
-6. WORKFLOWS
-------------
+6. IMPLEMENTATION BLUEPRINTS (DETAILED)
+--------------------------------------
 ${report.workflowIdeas?.map((wf, i) => `
-Workflow ${i + 1}: ${wf.name}
-Description: ${wf.description}
-Skill Level: ${wf.skillLevel}
-Setup Time: ${wf.setupTime}
-AI Role: ${wf.aiRole}
-Success Indicator: ${wf.successIndicator}
+WORKFLOW BLUEPRINT #${i + 1}: ${wf.name || wf.title}
+=======================================
+Skill Level Required: ${wf.skillLevel || "N/A"} (${wf.skillLevelExplanation || ""})
+Setup Commitment: ${wf.setupTimeBreakdown ? wf.setupTimeBreakdown.map(b => `${b.phase} (${b.duration})`).join(', ') : (wf.setupTime || "Varies")}
 
-Simple Flow:
-${wf.simpleFlow?.map((s, j) => `   ${j + 1}. ${s}`).join('\n')}
+${wf.architecture ? `1. ARCHITECTURE
+- Trigger: ${wf.architecture.trigger}
+- Input Data: ${wf.architecture.inputData}
+- Processing Steps:
+${wf.architecture.logic?.map((l, j) => `  ${j + 1}. ${l}`).join('\n')}
+- System Output: ${wf.architecture.output}
+- Final Storage: ${wf.architecture.storage}` : ""}
 
-Tools Required:
-${wf.toolsRequired?.map(t => `- ${t.name} (${t.type})${t.alternative ? ` (Alt: ${t.alternative})` : ""}`).join('\n')}
+${wf.implementationSteps ? `2. IMPLEMENTATION STEPS (STEP-BY-STEP)
+${wf.implementationSteps.map((s, j) => `[ ] Step ${j + 1}: ${s}`).join('\n')}` : ""}
 
-Zapier Templates:
-${wf.zapierTemplates?.map(t => `- ${t.name}: ${t.url}`).join('\n')}
+${wf.promptLogic ? `3. CRITICAL PROMPT LOGIC
+- Example Prompt: "${wf.promptLogic.examplePrompt}"
+- Dynamic Variables: ${wf.promptLogic.variables?.join(', ')}
+- Logic Structure: ${wf.promptLogic.structure}` : ""}
 
-Beginner Steps:
-${wf.beginnerSteps?.map((s, j) => `   ${j + 1}. ${s}`).join('\n')}
+${wf.dataStructure ? `4. DATA STRUCTURE & FORMAT
+- Required Fields: ${wf.dataStructure.requiredFields?.join(', ')}
+- Storage Format: ${wf.dataStructure.format}` : ""}
 
-${wf.advancedSteps ? `Advanced Steps:\n${wf.advancedSteps?.map((s, j) => `   ${j + 1}. ${s}`).join('\n')}` : ""}
+${wf.humanReviewPoints ? `5. HUMAN REVIEW PROTOCOL
+${wf.humanReviewPoints.map(p => `(!) REQUIREMENT: ${p}`).join('\n')}` : ""}
 
-Limitations:
-${wf.limitations?.map(l => `- ${l}`).join('\n')}
-`).join('\n')}
+${wf.failureHandling ? `6. FAILURE & EXCEPTION HANDLING
+- Common Errors: ${wf.failureHandling.commonErrors?.join(', ')}
+- Corrective Action: ${wf.failureHandling.correctionSteps}` : ""}
 
-7. AUTOMATION SYSTEM MAP
+${wf.expectedOutputExample ? `7. EXPECTED SAMPLE OUTPUT
+-------------------------
+${wf.expectedOutputExample}` : ""}
+
+${wf.zapierTemplates && wf.zapierTemplates.length > 0 ? `8. ZAPIER TEMPLATES (CLIENT READY)
+${wf.zapierTemplates.map(t => `- ${t.name}: ${t.url}`).join('\n')}` : ""}
+------------------------------------------------------
+`).join('\n\n')}
+
+${report.systemMap ? `7. AUTOMATION SYSTEM MAP
 ------------------------
-${report.systemMap.join(' → ')}
+${report.systemMap.join(' → ')}\n` : ""}
 
-8. AI RISK & COMPETITIVE INSIGHT
+${report.aiRiskInsight ? `8. AI RISK & COMPETITIVE INSIGHT
 --------------------------------
 Why AI cannot fully replace this role:
 ${report.aiRiskInsight.whyNotReplace}
@@ -527,13 +851,13 @@ Where AI gives competitors an advantage:
 ${report.aiRiskInsight.competitorAdvantage}
 
 What happens if you do nothing:
-${report.aiRiskInsight.doingNothingRisk}
+${report.aiRiskInsight.doingNothingRisk}\n` : ""}
 
-9. NEXT STEP ROADMAP
+${report.roadmap ? `9. NEXT STEP ROADMAP
 --------------------
 Stage 1: ${report.roadmap.stage1}
 Stage 2: ${report.roadmap.stage2}
-Stage 3: ${report.roadmap.stage3}
+Stage 3: ${report.roadmap.stage3}\n` : ""}
 
 10. IMPORTANT LIMITATIONS
 ------------------------
@@ -541,8 +865,8 @@ ${report.limitations?.map(l => `- ${l}`).join('\n')}
 
 11. ESTIMATED MONTHLY COST
 --------------------------
-${report.estimatedMonthlyCost.items?.map(item => `— ${item.toolName}: ${item.cost} (reason: ${item.reason})`).join('\n')}
-TOTAL ESTIMATE: ${report.estimatedMonthlyCost.totalEstimate}
+${report.estimatedMonthlyCost.items?.map(item => `— ${item.toolName}: ${item.costTier} (${item.costRange}) (reason: ${item.reason})`).join('\n')}
+Estimated Cost Range: ${report.estimatedMonthlyCost.overallCostTier}
 
 12. 💰 COST VS VALUE
 --------------------
@@ -558,6 +882,8 @@ Learn how to build and manage these AI workflows yourself with our expert-led tr
 
 Option 2: Done-For-You
 Skip the learning curve. We'll set up, test, and launch your entire automation system for you.
+
+CONFIDENTIALITY NOTICE: This document is a strategic consulting deliverable. Recommendations are based on strategic indices. ROI figures are estimates based on standard productivity models.
     `.trim();
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -757,6 +1083,19 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Work Description / Specific Tasks (Optional)</label>
+                  <textarea
+                    name="workDescription"
+                    value={formData.workDescription}
+                    onChange={handleInputChange}
+                    rows={3}
+                    placeholder="Describe your daily workflow or list specific tasks you want to automate..."
+                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all bg-neutral-50/50 dark:bg-neutral-800/50 dark:text-white resize-none"
+                  />
+                  <p className="text-[10px] text-neutral-400">Providing specific tasks allows for a much more accurate automation plan.</p>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Tools Used (Optional)</label>
                   <input
                     name="toolsUsed"
@@ -948,14 +1287,26 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                   </div>
 
                   <div id="report-content" className="space-y-12">
+                    {/* Professional Badge */}
+                    <div className="flex justify-center sm:justify-start">
+                      <div className="px-4 py-1.5 bg-neutral-900 dark:bg-neutral-800 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full flex items-center gap-2 shadow-xl border border-white/10">
+                        <Shield className="w-3 h-3 text-emerald-400" />
+                        Executive Consulting Deliverable
+                      </div>
+                    </div>
+
                     {/* ROI Calculator */}
                     <ROICalculator 
-                    roi={report.roiAnalysis} 
-                    hourlyRate={hourlyRate} 
-                    setHourlyRate={setHourlyRate} 
-                    currencySymbol={currencySymbol}
-                    setCurrencySymbol={setCurrencySymbol}
-                  />
+                      roi={report.roiAnalysis} 
+                      hourlyRate={hourlyRate} 
+                      setHourlyRate={setHourlyRate} 
+                      currencySymbol={currencySymbol} 
+                      setCurrencySymbol={setCurrencySymbol} 
+                      calcMode={calcMode}
+                      setCalcMode={setCalcMode}
+                      monthlySalary={monthlySalary}
+                      setMonthlySalary={setMonthlySalary}
+                    />
                   {report.personalizationNote && (
                     <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex gap-3 items-start">
                       <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
@@ -1128,7 +1479,7 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                     <div className="grid sm:grid-cols-2 gap-6">
                       <div className="bg-emerald-600 text-white p-8 rounded-3xl shadow-xl shadow-emerald-600/20 flex flex-col items-center text-center">
                         <Clock className="w-10 h-10 mb-4 opacity-80" />
-                        <div className="text-4xl font-black mb-2">{report.impactEstimate.hoursSavedPerWeek}</div>
+                        <div className="text-4xl font-black mb-2">~{report.impactEstimate.hoursSavedPerWeek}</div>
                         <div className="text-emerald-100 font-medium uppercase tracking-widest text-xs">Hours Saved Per Week</div>
                       </div>
                       <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-xl flex flex-col items-center text-center">
@@ -1166,237 +1517,350 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                               </span>
                               <span className="flex items-center gap-1 text-xs font-bold text-neutral-400">
                                 <Clock className="w-3 h-3" />
-                                {wf.setupTime}
+                                {wf.setupTimeBreakdown?.[0]?.duration || wf.setupTime || "Varies"}
                               </span>
                             </div>
                           </div>
                           
-                          <div className="p-8 grid lg:grid-cols-2 gap-12">
-                            <div className="space-y-8">
-                              {/* Visual Diagram */}
-                              <div className="space-y-3">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Workflow Visualization</p>
-                                <WorkflowDiagram diagram={wf.diagram} />
-                              </div>
-
-                              {/* Zapier Templates */}
-                              <div className="space-y-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Zapier Templates</p>
-                                <div className="grid sm:grid-cols-2 gap-4">
-                                  {wf.zapierTemplates?.map((template, idx) => (
-                                    <a 
-                                      key={`zap-${i}-${idx}`}
-                                      href={template.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all group"
-                                    >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <Zap className="w-4 h-4 text-emerald-600" />
-                                        <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-emerald-600 transition-colors" />
-                                      </div>
-                                      <p className="text-sm font-bold dark:text-white mb-1">{template.name}</p>
-                                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{template.description}</p>
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div>
-                                <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                  <Workflow className="w-3 h-3" /> Simple Flow
-                                </h5>
-                                <div className="space-y-3">
-                                  {wf.simpleFlow?.map((step, j) => (
-                                    <div key={`flow-${i}-${j}`} className="flex gap-3 items-center">
-                                      <div className="w-5 h-5 rounded-full bg-neutral-100 text-neutral-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                        {j + 1}
-                                      </div>
-                                      <p className="text-sm text-neutral-600 font-medium">{step}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div>
-                                <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                  <Wrench className="w-3 h-3" /> Tools Required
-                                </h5>
-                                <div className="grid gap-3">
-                                  {wf.toolsRequired?.map((tool, j) => (
-                                    <div key={`tool-${i}-${j}`} className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-100">
-                                      <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-neutral-700">{tool.name}</span>
-                                        {tool.alternative && <span className="text-[10px] text-neutral-400">Alt: {tool.alternative}</span>}
-                                      </div>
-                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${tool.type === "Free" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                        {tool.type}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div>
-                                <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                  <Sparkles className="w-3 h-3" /> AI Role
-                                </h5>
-                                <p className="text-sm text-black dark:text-white leading-relaxed bg-neutral-50 dark:bg-neutral-800 p-5 rounded-2xl border-l-4 border-blue-500 shadow-sm italic font-medium">
-                                  "{wf.aiRole}"
-                                </p>
-                              </div>
-
-                              <div>
-                                <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                  <CheckCircle2 className="w-3 h-3" /> Success Indicator
-                                </h5>
-                                <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                                  {wf.successIndicator}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-8">
-                              <div>
-                                <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                  <ListChecks className="w-3 h-3" /> Beginner Setup Steps
-                                </h5>
-                                <div className="space-y-4">
-                                  {wf.beginnerSteps?.map((step, j) => (
-                                    <div key={`begin-${i}-${j}`} className="flex gap-4">
-                                      <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                                        {j + 1}
-                                      </div>
-                                      <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{step}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {wf.advancedSteps && (
-                                <div>
-                                  <h5 className="text-xs font-bold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                                    <Zap className="w-3 h-3" /> Advanced Setup (Optional)
+                          {wf.architecture && (
+                            <div className="p-8 grid lg:grid-cols-2 gap-12">
+                              <div className="space-y-8">
+                                {/* Workflow Architecture Card */}
+                                <div className="p-6 bg-neutral-900 text-white rounded-3xl shadow-xl overflow-hidden relative">
+                                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <LayoutDashboard className="w-16 h-16" />
+                                  </div>
+                                  <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                                    <Workflow className="w-3 h-3" /> 1. Workflow Architecture
                                   </h5>
-                                  <div className="space-y-4">
-                                    {wf.advancedSteps?.map((step, j) => (
-                                      <div key={`adv-${i}-${j}`} className="flex gap-4">
-                                        <div className="w-6 h-6 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                                          {j + 1}
-                                        </div>
-                                        <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{step}</p>
+                                  <div className="grid sm:grid-cols-2 gap-6 relative z-10">
+                                    <div className="space-y-4">
+                                      <div className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-colors">
+                                        <p className="text-[9px] font-bold text-white/40 uppercase mb-1">Trigger Event</p>
+                                        <p className="text-sm font-bold text-emerald-400">{wf.architecture.trigger}</p>
                                       </div>
-                                    ))}
+                                      <div className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-colors">
+                                        <p className="text-[9px] font-bold text-white/40 uppercase mb-1">Input Data Source</p>
+                                        <p className="text-sm font-bold">{wf.architecture.inputData}</p>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                      <div className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-colors">
+                                        <p className="text-[9px] font-bold text-white/40 uppercase mb-1">Processing Logic</p>
+                                        <ul className="space-y-1">
+                                          {wf.architecture.logic?.map((l, idx) => (
+                                            <li key={`logic-${idx}`} className="text-xs flex items-start gap-2">
+                                              <span className="text-emerald-400">•</span> {l}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                      <div className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                          <div>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase mb-1">Output & Storage</p>
+                                            <p className="text-xs font-bold text-emerald-400">{wf.architecture.output}</p>
+                                            <p className="text-[10px] text-white/60">Stored in: {wf.architecture.storage}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                              )}
 
-                              {wf.limitations.length > 0 && (
-                                <div className="p-5 bg-neutral-50 dark:bg-neutral-800 rounded-2xl border-l-4 border-amber-500 shadow-sm">
-                                  <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-2">
-                                    <AlertTriangle className="w-3 h-3" /> Limitations
-                                  </h5>
-                                  <ul className="space-y-2">
-                                    {wf.limitations?.map((lim, j) => (
-                                      <li key={`wf-lim-${i}-${j}`} className="text-xs text-black dark:text-white flex items-center gap-2 font-medium">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                                        {lim}
-                                      </li>
-                                    ))}
-                                  </ul>
+                                {/* Detailed Implementation Steps */}
+                                {wf.implementationSteps && (
+                                  <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-sm">
+                                    <h5 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-6 flex items-center gap-2">
+                                      <ListChecks className="w-3 h-3 text-blue-500" /> 2. Detailed Implementation
+                                    </h5>
+                                    <div className="space-y-4">
+                                      {wf.implementationSteps.map((step, idx) => (
+                                        <div key={`step-${idx}`} className="flex gap-4 group">
+                                          <div className="w-6 h-6 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-[10px] font-black text-neutral-500 shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                            {idx + 1}
+                                          </div>
+                                          <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">{step}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {wf.setupTimeBreakdown && (
+                                      <div className="mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-800">
+                                        <h6 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
+                                          <Clock className="w-3 h-3 text-emerald-500" /> Setup Time Breakdown
+                                        </h6>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                          {wf.setupTimeBreakdown.map((bt, idx) => (
+                                            <div key={`bt-${idx}`} className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl border border-neutral-100 dark:border-neutral-700 shadow-sm">
+                                              <p className="text-[10px] font-black text-neutral-400 uppercase tracking-tighter truncate mb-1">{bt.phase}</p>
+                                              <p className="text-base font-black text-neutral-900 dark:text-white">{bt.duration}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Prompt Logic & Data Structure */}
+                                <div className="grid sm:grid-cols-2 gap-8">
+                                  {wf.promptLogic && (
+                                    <div className="p-8 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-900/30 shadow-sm">
+                                      <h5 className="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-6 flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4" /> 3. Strategic AI Framework
+                                      </h5>
+                                      <div className="bg-neutral-900 p-6 rounded-2xl border border-indigo-500/30 mb-6 shadow-inner ring-1 ring-white/5">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase mb-3 tracking-tighter">High-Performance Prompt Template</p>
+                                        <div className="relative">
+                                          <p className="text-base font-serif text-white leading-relaxed italic pr-4">
+                                            <span className="text-indigo-500 text-2xl absolute -left-2 -top-2 opacity-50">"</span>
+                                            {wf.promptLogic.examplePrompt}
+                                            <span className="text-indigo-500 text-2xl absolute -right-0 bottom-0 translate-y-2 opacity-50">"</span>
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-4">
+                                        <div className="flex flex-wrap gap-2">
+                                          {wf.promptLogic.variables?.map((v, idx) => (
+                                            <span key={`var-${idx}`} className="px-3 py-1 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-indigo-300 text-xs font-black rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-sm">
+                                              # {v}
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <div className="pt-4 border-t border-indigo-100 dark:border-indigo-900/50">
+                                          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Logic Architecture</p>
+                                          <p className="text-sm text-neutral-700 dark:text-neutral-300 font-medium leading-tight">{wf.promptLogic.structure}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {wf.dataStructure && (
+                                    <div className="p-8 bg-neutral-50 dark:bg-neutral-800/50 rounded-[2rem] border-2 border-neutral-200 dark:border-neutral-800 shadow-sm">
+                                      <h5 className="text-xs font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400 mb-6 flex items-center gap-2">
+                                        <History className="w-4 h-4" /> 4. Data Asset Structure
+                                      </h5>
+                                      <div className="space-y-6">
+                                        <div className="grid grid-cols-2 gap-3">
+                                          {wf.dataStructure.requiredFields?.map((f, idx) => (
+                                            <div key={`field-${idx}`} className="p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs flex items-center gap-2">
+                                              <div className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
+                                              <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">{f}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="p-5 bg-white dark:bg-neutral-900 rounded-2xl border-2 border-neutral-100 dark:border-neutral-700 shadow-sm">
+                                          <p className="text-[10px] font-black text-neutral-400 uppercase mb-2 tracking-widest">Standard Format</p>
+                                          <p className="text-sm text-neutral-900 dark:text-white font-black">{wf.dataStructure.format}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
+
+                              <div className="space-y-8">
+                                {/* Visual Diagram */}
+                                {wf.diagram && (
+                                  <div className="space-y-3">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 flex items-center gap-2">
+                                      <Target className="w-3 h-3" /> System Logic Map
+                                    </p>
+                                    <WorkflowDiagram diagram={wf.diagram} />
+                                  </div>
+                                )}
+
+                                {/* Zapier Templates */}
+                                {wf.zapierTemplates && wf.zapierTemplates.length > 0 && (
+                                  <div className="space-y-4">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Zapier Connector Blueprints</p>
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                      {wf.zapierTemplates.map((template, idx) => (
+                                        <a 
+                                          key={`zap-${i}-${idx}`}
+                                          href={template.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-4 bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all group shadow-sm"
+                                        >
+                                          <div className="flex items-center justify-between mb-2">
+                                            <Zap className="w-4 h-4 text-emerald-600" />
+                                            <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-emerald-600 transition-colors" />
+                                          </div>
+                                          <p className="text-sm font-bold dark:text-white mb-1 leading-tight">{template.name}</p>
+                                          <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed">{template.description}</p>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Specialized Sections */}
+                                <div className="grid sm:grid-cols-2 gap-8">
+                                  {wf.humanReviewPoints && (
+                                    <div className="p-8 bg-amber-50 dark:bg-amber-900/10 rounded-[2rem] border-2 border-amber-200 dark:border-amber-900/40 shadow-sm">
+                                      <h5 className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-6 flex items-center gap-2">
+                                        <ShieldAlert className="w-4 h-4" /> 5. Critical Human Review Points
+                                      </h5>
+                                      <div className="space-y-4">
+                                        {wf.humanReviewPoints.map((point, idx) => (
+                                          <div key={`hr-${idx}`} className="flex gap-4 p-5 bg-white dark:bg-amber-950/20 rounded-2xl border border-amber-100 dark:border-amber-900/50 shadow-sm hover:border-amber-400 transition-colors">
+                                            <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-lg shadow-amber-500/20">
+                                              !
+                                            </div>
+                                            <p className="text-sm text-black dark:text-amber-100 font-bold leading-relaxed">{point}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {wf.failureHandling && (
+                                    <div className="p-8 bg-rose-50 dark:bg-rose-900/10 rounded-[2rem] border-2 border-rose-200 dark:border-rose-900/40 shadow-sm">
+                                      <h5 className="text-xs font-black uppercase tracking-widest text-rose-700 dark:text-rose-400 mb-6 flex items-center gap-2">
+                                        <AlertTriangle className="w-4 h-4" /> 6. System Failure Protocols
+                                      </h5>
+                                      <div className="space-y-6">
+                                        <div className="bg-white dark:bg-rose-950/20 p-5 rounded-2xl border border-rose-100 dark:border-rose-900/50">
+                                          <p className="text-[10px] font-black text-rose-500 uppercase mb-3 tracking-widest">Common Error Vectors</p>
+                                          <ul className="space-y-2">
+                                            {wf.failureHandling.commonErrors?.map((err, idx) => (
+                                              <li key={`err-${idx}`} className="text-xs text-rose-900 dark:text-rose-200 font-black flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500" /> {err}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                        <div className="p-6 bg-rose-600 rounded-2xl shadow-xl shadow-rose-600/20 relative overflow-hidden group">
+                                          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                          <p className="text-[10px] font-black text-white/50 uppercase mb-2 tracking-widest relative z-10">Standard Correction Action</p>
+                                          <p className="text-base text-white font-black leading-relaxed relative z-10">{wf.failureHandling.correctionSteps}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Sample Output Example */}
+                                {wf.expectedOutputExample && (
+                                  <div className="p-6 bg-neutral-900 text-white rounded-3xl relative overflow-hidden group">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <h5 className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-4 flex items-center gap-2">
+                                      <Lightbulb className="w-3 h-3" /> 10. Expected Output Example
+                                    </h5>
+                                    <div className="p-5 bg-white hidden dark:block dark:bg-white/5 rounded-2xl border border-white/10 font-mono text-sm leading-relaxed text-blue-200">
+                                      {wf.expectedOutputExample}
+                                    </div>
+                                    <div className="p-5 bg-neutral-800 block dark:hidden rounded-2xl border border-neutral-700 font-mono text-sm leading-relaxed text-blue-300 shadow-inner">
+                                      {wf.expectedOutputExample}
+                                    </div>
+                                    <p className="text-[9px] mt-4 opacity-50 uppercase tracking-widest text-center">Customization Level: {wf.customizationOptions}</p>
+                                  </div>
+                                )}
+
+                                <div className="p-5 border border-dashed border-neutral-200 dark:border-neutral-800 rounded-3xl text-center">
+                                  <p className="text-[10px] text-neutral-400 uppercase tracking-widest mb-1 italic">Skill Level Needed: {wf.skillLevel}</p>
+                                  <p className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium px-4">{wf.skillLevelExplanation}</p>
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   </section>
 
                   {/* System Map */}
-                  <section id="map" className="scroll-mt-24">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-neutral-100 p-2 rounded-lg">
-                        <Map className="w-6 h-6 text-neutral-600" />
+                  {report.systemMap && (
+                    <section id="map" className="scroll-mt-24">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-neutral-100 p-2 rounded-lg">
+                          <Map className="w-6 h-6 text-neutral-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold tracking-tight">7. 🧠 Automation System Map</h3>
                       </div>
-                      <h3 className="text-2xl font-bold tracking-tight">7. 🧠 Automation System Map</h3>
-                    </div>
-                    <div className="bg-neutral-900 p-12 rounded-3xl">
-                      <div className="flex flex-col gap-2 text-white font-bold tracking-tight max-w-3xl mx-auto">
-                        {report.systemMap?.map((step, i) => (
-                          <React.Fragment key={`system-step-${i}`}>
-                            <div className="flex items-center gap-6 group">
-                              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/20 group-hover:bg-emerald-500/30 transition-colors shrink-0 font-black">
-                                {i + 1}
+                      <div className="bg-neutral-900 p-12 rounded-3xl">
+                        <div className="flex flex-col gap-2 text-white font-bold tracking-tight max-w-3xl mx-auto">
+                          {report.systemMap.map((step, i) => (
+                            <React.Fragment key={`system-step-${i}`}>
+                              <div className="flex items-center gap-6 group">
+                                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/20 group-hover:bg-emerald-500/30 transition-colors shrink-0 font-black">
+                                  {i + 1}
+                                </div>
+                                <div className="px-6 py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors flex-1 text-left">
+                                  {step.trim()}
+                                </div>
                               </div>
-                              <div className="px-6 py-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors flex-1 text-left">
-                                {step.trim()}
-                              </div>
-                            </div>
-                            {i < report.systemMap.length - 1 && (
-                              <div className="flex justify-center py-2">
-                                <ArrowDown className="w-6 h-6 text-neutral-700" />
-                              </div>
-                            )}
-                          </React.Fragment>
-                        ))}
+                              {i < (report.systemMap?.length || 0) - 1 && (
+                                <div className="flex justify-center py-2">
+                                  <ArrowDown className="w-6 h-6 text-neutral-700" />
+                                </div>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
 
                   {/* AI Risk Insight */}
-                  <section id="risk" className="scroll-mt-24">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-red-100 p-2 rounded-lg">
-                        <Shield className="w-6 h-6 text-red-600" />
+                  {report.aiRiskInsight && (
+                    <section id="risk" className="scroll-mt-24">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-red-100 p-2 rounded-lg">
+                          <Shield className="w-6 h-6 text-red-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold tracking-tight">8. 🛡️ AI Risk & Competitive Insight</h3>
                       </div>
-                      <h3 className="text-2xl font-bold tracking-tight">8. 🛡️ AI Risk & Competitive Insight</h3>
-                    </div>
-                    <div className="grid sm:grid-cols-3 gap-6">
-                      <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-4">Why AI Can't Replace You</h4>
-                        <p className="text-sm text-black dark:text-white leading-relaxed font-medium">{report.aiRiskInsight.whyNotReplace}</p>
+                      <div className="grid sm:grid-cols-3 gap-6">
+                        <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-4">Why AI Can't Replace You</h4>
+                          <p className="text-sm text-black dark:text-white leading-relaxed font-medium">{report.aiRiskInsight.whyNotReplace}</p>
+                        </div>
+                        <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-4">Competitor Advantage</h4>
+                          <p className="text-sm text-black dark:text-white leading-relaxed font-medium">{report.aiRiskInsight.competitorAdvantage}</p>
+                        </div>
+                        <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border-2 border-red-500 shadow-xl">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 mb-4">Risk of Doing Nothing</h4>
+                          <p className="text-base text-black dark:text-white leading-relaxed font-black">{report.aiRiskInsight.doingNothingRisk}</p>
+                        </div>
                       </div>
-                      <div className="bg-white dark:bg-neutral-900 p-6 rounded-2xl border border-neutral-300 dark:border-neutral-700 shadow-sm">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-4">Competitor Advantage</h4>
-                        <p className="text-sm text-black dark:text-white leading-relaxed font-medium">{report.aiRiskInsight.competitorAdvantage}</p>
-                      </div>
-                      <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border-2 border-red-500 shadow-xl">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 mb-4">Risk of Doing Nothing</h4>
-                        <p className="text-base text-black dark:text-white leading-relaxed font-black">{report.aiRiskInsight.doingNothingRisk}</p>
-                      </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
 
                   {/* Roadmap */}
-                  <section id="roadmap" className="scroll-mt-24">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="bg-emerald-100 p-2 rounded-lg">
-                        <Flag className="w-6 h-6 text-emerald-600" />
+                  {report.roadmap && (
+                    <section id="roadmap" className="scroll-mt-24">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-emerald-100 p-2 rounded-lg">
+                          <Flag className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold tracking-tight">9. 🚀 Next Step Roadmap</h3>
                       </div>
-                      <h3 className="text-2xl font-bold tracking-tight">9. 🚀 Next Step Roadmap</h3>
-                    </div>
-                    <div className="relative">
-                      <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-neutral-100 hidden sm:block" />
-                      <div className="space-y-8">
-                        {[
-                          { stage: "Stage 1: Implementation", content: report.roadmap.stage1, color: "bg-emerald-600" },
-                          { stage: "Stage 2: Next Level", content: report.roadmap.stage2, color: "bg-blue-600" },
-                          { stage: "Stage 3: Scaling", content: report.roadmap.stage3, color: "bg-purple-600" }
-                        ].map((step, i) => (
-                          <div key={`roadmap-step-${i}`} className="relative flex flex-col sm:flex-row gap-8 items-start">
-                            <div className={`w-16 h-16 rounded-2xl ${step.color} text-white flex items-center justify-center text-xl font-black shrink-0 shadow-lg z-10 mx-auto sm:mx-0`}>
-                              {i + 1}
+                      <div className="relative">
+                        <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-neutral-100 hidden sm:block" />
+                        <div className="space-y-8">
+                          {[
+                            { stage: "Stage 1: Implementation", content: report.roadmap.stage1, color: "bg-emerald-600" },
+                            { stage: "Stage 2: Next Level", content: report.roadmap.stage2, color: "bg-blue-600" },
+                            { stage: "Stage 3: Scaling", content: report.roadmap.stage3, color: "bg-purple-600" }
+                          ].map((step, i) => (
+                            <div key={`roadmap-step-${i}`} className="relative flex flex-col sm:flex-row gap-8 items-start">
+                              <div className={`w-16 h-16 rounded-2xl ${step.color} text-white flex items-center justify-center text-xl font-black shrink-0 shadow-lg z-10 mx-auto sm:mx-0`}>
+                                {i + 1}
+                              </div>
+                              <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-sm flex-1">
+                                <h4 className="font-black text-neutral-900 dark:text-white mb-2">{step.stage}</h4>
+                                <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{step.content}</p>
+                              </div>
                             </div>
-                            <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-sm flex-1">
-                              <h4 className="font-black text-neutral-900 dark:text-white mb-2">{step.stage}</h4>
-                              <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{step.content}</p>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </section>
+                    </section>
+                  )}
 
                   {/* Limitations */}
                   <section id="limitations" className="scroll-mt-24 pb-12">
@@ -1434,15 +1898,16 @@ Skip the learning curve. We'll set up, test, and launch your entire automation s
                             <div key={`cost-item-${i}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl border border-neutral-100 dark:border-neutral-700">
                               <div>
                                 <div className="font-bold text-neutral-900 dark:text-white">— {item.toolName}</div>
+                                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{item.costTier}</div>
                                 <div className="text-xs text-neutral-500 dark:text-neutral-400 italic">reason: {item.reason}</div>
                               </div>
-                              <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{item.cost}</div>
+                              <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{item.costRange}</div>
                             </div>
                           ))}
                         </div>
                         <div className="mt-6 pt-6 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
-                          <div className="text-sm font-bold text-neutral-400 uppercase tracking-widest">Total Estimate</div>
-                          <div className="text-2xl font-black text-neutral-900 dark:text-white">{report.estimatedMonthlyCost.totalEstimate}</div>
+                          <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Estimated Cost Range</div>
+                          <div className="text-xl font-black text-neutral-900 dark:text-white px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full">{report.estimatedMonthlyCost.overallCostTier}</div>
                         </div>
                       </div>
                     </div>

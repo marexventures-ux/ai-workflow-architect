@@ -24,13 +24,34 @@ export interface ImpactEstimate {
 export interface WorkflowIdea {
   name: string;
   description: string;
+  skillLevelExplanation: string;
   skillLevel: "Beginner" | "Intermediate" | "Advanced";
-  setupTime: string;
+  setupTimeBreakdown: { phase: string; duration: string }[];
   toolsRequired: { name: string; type: "Free" | "Paid"; alternative?: string }[];
-  limitations: string[];
-  simpleFlow: string[];
-  beginnerSteps: string[];
-  advancedSteps?: string[];
+  architecture: {
+    trigger: string;
+    inputData: string;
+    logic: string[];
+    output: string;
+    storage: string;
+  };
+  implementationSteps: string[];
+  promptLogic: {
+    examplePrompt: string;
+    variables: string[];
+    structure: string;
+  };
+  dataStructure: {
+    requiredFields: string[];
+    format: string;
+  };
+  humanReviewPoints: string[];
+  failureHandling: {
+    commonErrors: string[];
+    correctionSteps: string;
+  };
+  customizationOptions: string;
+  expectedOutputExample: string;
   aiRole: string;
   successIndicator: string;
 }
@@ -49,7 +70,8 @@ export interface Roadmap {
 
 export interface CostItem {
   toolName: string;
-  cost: string;
+  costTier: 'Low Cost' | 'Medium Cost' | 'High Cost';
+  costRange: string;
   reason: string;
 }
 
@@ -64,11 +86,19 @@ export interface CostVsValue {
   comparison: string;
 }
 
+export interface ROIBreakdownItem {
+  taskName: string;
+  hoursSaved: number;
+}
+
 export interface ROIAnalysis {
-  estimatedMonthlySavings: number;
-  estimatedYearlySavings: number;
+  estimatedLaborSavings: number;
+  directExpensesSavings: number;
+  totalMonthlyValue: number;
   hoursSavedPerMonth: number;
-  paybackPeriodMonths: number;
+  paybackPeriod: string;
+  calculationLogic: string;
+  breakdown: ROIBreakdownItem[];
 }
 
 export interface ZapierTemplate {
@@ -107,7 +137,7 @@ export interface AutomationReport {
   personalizationNote?: string;
   estimatedMonthlyCost: {
     items: CostItem[];
-    totalEstimate: string;
+    overallCostTier: 'Low Setup' | 'Medium Setup' | 'High Setup';
   };
   costVsValue: CostVsValue;
 }
@@ -117,20 +147,38 @@ export async function generateAutomationReport(userData: {
   industry: string;
   toolsUsed?: string;
   mostTimeConsumingTask?: string;
+  workDescription?: string;
   currencySymbol?: string;
+  monthlySalary?: number;
+  hourlyRate?: number;
+  calcMode?: 'hourly' | 'monthly';
 }): Promise<AutomationReport> {
   const currency = userData.currencySymbol || "$";
+  const salaryText = userData.calcMode === 'monthly' ? `Monthly Salary: ${currency}${userData.monthlySalary}` : `Hourly Rate: ${currency}${userData.hourlyRate}`;
+  
   const prompt = `
     As an AI Workflow Architect, analyze the following job details and provide a comprehensive, practical, and actionable automation report.
     
-    User Input:
+    User Context:
     - Job Role: ${userData.jobRole}
     - Industry: ${userData.industry}
+    - Financial Context: ${salaryText}
+    - Detailed Work Description/Tasks (Optional): ${userData.workDescription || "Not specified."}
     - Tools Currently Used (Optional): ${userData.toolsUsed || "Not specified, suggest common tools."}
     - Most Time-Consuming Task (Optional): ${userData.mostTimeConsumingTask || "Not specified."}
     - Preferred Currency: ${currency}
     
+    ROI CALCULATION PROTOCOL (MANDATORY):
+    Step 1: Identify "Hours Saved Per Month" by summing the breakdown of 3-5 specific tasks.
+    Step 2: Calculate "Hourly Value" strictly using: 
+       If Monthly Salary provided: Hourly Value = Monthly Salary ÷ 160
+       If Hourly Rate provided: Hourly Value = Hourly Rate
+    Step 3: Compute "Labor Savings" = Hours Saved × Hourly Value.
+    Step 4: Identify "Direct Expenses Savings" (e.g., cutting old software costs) ONLY if applicable.
+    Step 5: Compute "Total Monthly Value" = Labor Savings + Direct Expenses Savings.
+
     Your goal is to create a practical blueprint that makes the user say "I can actually start this today."
+    If the user provided a "Detailed Work Description/Tasks", prioritize analyzing those specific tasks for automation.
     
     IMPORTANT: All financial estimates, costs, and savings MUST be provided in the user's preferred currency (${currency}). If you need to convert from USD, use current approximate exchange rates.
     
@@ -139,21 +187,40 @@ export async function generateAutomationReport(userData: {
     2. TASK BREAKDOWN: Automatable, AI-Enhanced, and Manual (Human-Centric) tasks.
     3. AUTOMATION PRIORITY SCORE: Rank tasks based on direct business impact (revenue/lost sales) and ease.
     4. 🚀 START HERE: Recommend ONLY ONE workflow the user should begin with.
-    5. ROI ANALYSIS: Provide numerical estimates for:
-       - estimatedMonthlySavings (Number, in ${currency})
-       - estimatedYearlySavings (Number, in ${currency})
+    5. ROI ANALYSIS: Numerical estimates strictly derived from the ROI CALCULATION PROTOCOL.
+       - estimatedLaborSavings (Number, in ${currency})
+       - directExpensesSavings (Number, in ${currency}, default to 0)
+       - totalMonthlyValue (Number, in ${currency})
        - hoursSavedPerMonth (Number)
-       - paybackPeriodMonths (Number, usually 1-3)
-    6. WORKFLOWS: Create 2-4 detailed workflows. For each:
-       - Include a "zapierTemplates" array with 1-2 realistic Zapier template ideas (name, description, and a placeholder URL like "https://zapier.com/apps/google-sheets/integrations").
-       - Include a "diagram" object with "nodes" and "edges" to represent the flow visually.
-         - Nodes should have unique IDs and labels.
-         - Types: "trigger", "action", "ai", "end".
+       - paybackPeriod (String) - MUST be a range (e.g., "~2.4 – 3.6 weeks").
+       - calculationLogic (String) - Explain the math (e.g., "12 hrs saved x ${currency}625/hr labor value").
+       - breakdown: A list of 3-5 specific tasks and hours saved for each.
+    6. WORKFLOWS: Create 2-4 COMPLETE IMPLEMENTATION BLUEPRINTS. Do NOT summarize. Provide depth for real-world deployment.
+       For each workflow, include:
+       - architecture: Map out Trigger -> Input -> Logic -> Output -> Storage.
+       - implementationSteps: Detailed, actionable list of setup instructions (no vague advice).
+       - promptLogic: A complete, reusable AI prompt with variables (e.g., "[Client_Name]").
+       - dataStructure: Define required fields and required format (e.g., Google Sheet columns).
+       - humanReviewPoints: Where manual intervention or approval is mandatory.
+       - failureHandling: List of common errors and precise correction steps.
+       - setupTimeBreakdown: Breakdown of time by phase (e.g., "Phase 1: Tool Connection - 30m").
+       - customizationOptions: How to adjust tone, format, or depth.
+       - skillLevelExplanation: Describe what a user at this level needs to know or do.
+       - expectedOutputExample: A specific "Sample Result" showing what the automation produces.
+       - zapierTemplates: Realistic Zapier template ideas.
+       - diagram: Nodes (trigger, ai, action, end) and edges.
     7. TIME SAVED + BUSINESS IMPACT: Estimate hours saved and business value.
     8. AUTOMATION SYSTEM MAP: A simple, linear flow chain.
     9. AI RISK & COMPETITIVE INSIGHT: Why AI won't replace them, but how it helps competitors.
     10. NEXT STEP ROADMAP: A 3-stage progression.
-    11. ESTIMATED MONTHLY COST: List paid tools and costs.
+    11. ESTIMATED MONTHLY COST: Categorize required tools into cost tiers.
+        - Low Cost: 0 - ${currency}10,000 monthly equivalent.
+        - Medium Cost: ${currency}10,000 - ${currency}50,000 monthly equivalent.
+        - High Cost: ${currency}50,000+ monthly equivalent.
+        - CRITICAL: Use ranges for cost (e.g., "${currency}20,000 - ${currency}40,000/mo"). 
+        - NEVER output a single exact total for all tools combined. Instead, classify the "overallCostTier" as "Low Setup", "Medium Setup", or "High Setup".
+        - items: A list of products (toolName, costTier, costRange, reason).
+        - overallCostTier: An overall summary label.
     12. 💰 COST VS VALUE: Explain the return on investment.
   `;
 
@@ -203,12 +270,25 @@ export async function generateAutomationReport(userData: {
       roiAnalysis: {
         type: Type.OBJECT,
         properties: {
-          estimatedMonthlySavings: { type: Type.NUMBER },
-          estimatedYearlySavings: { type: Type.NUMBER },
+          estimatedLaborSavings: { type: Type.NUMBER },
+          directExpensesSavings: { type: Type.NUMBER },
+          totalMonthlyValue: { type: Type.NUMBER },
           hoursSavedPerMonth: { type: Type.NUMBER },
-          paybackPeriodMonths: { type: Type.NUMBER },
+          paybackPeriod: { type: Type.STRING },
+          calculationLogic: { type: Type.STRING },
+          breakdown: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                taskName: { type: Type.STRING },
+                hoursSaved: { type: Type.NUMBER },
+              },
+              required: ["taskName", "hoursSaved"],
+            },
+          },
         },
-        required: ["estimatedMonthlySavings", "estimatedYearlySavings", "hoursSavedPerMonth", "paybackPeriodMonths"],
+        required: ["estimatedLaborSavings", "directExpensesSavings", "totalMonthlyValue", "hoursSavedPerMonth", "paybackPeriod", "calculationLogic", "breakdown"],
       },
       workflowIdeas: {
         type: Type.ARRAY,
@@ -217,8 +297,18 @@ export async function generateAutomationReport(userData: {
           properties: {
             name: { type: Type.STRING },
             description: { type: Type.STRING },
+            skillLevelExplanation: { type: Type.STRING },
             skillLevel: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
-            setupTime: { type: Type.STRING },
+            setupTimeBreakdown: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  phase: { type: Type.STRING },
+                  duration: { type: Type.STRING },
+                },
+              },
+            },
             toolsRequired: {
               type: Type.ARRAY,
               items: {
@@ -231,10 +321,42 @@ export async function generateAutomationReport(userData: {
                 required: ["name", "type"],
               },
             },
-            limitations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            simpleFlow: { type: Type.ARRAY, items: { type: Type.STRING } },
-            beginnerSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            advancedSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+            architecture: {
+              type: Type.OBJECT,
+              properties: {
+                trigger: { type: Type.STRING },
+                inputData: { type: Type.STRING },
+                logic: { type: Type.ARRAY, items: { type: Type.STRING } },
+                output: { type: Type.STRING },
+                storage: { type: Type.STRING },
+              },
+            },
+            implementationSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+            promptLogic: {
+              type: Type.OBJECT,
+              properties: {
+                examplePrompt: { type: Type.STRING },
+                variables: { type: Type.ARRAY, items: { type: Type.STRING } },
+                structure: { type: Type.STRING },
+              },
+            },
+            dataStructure: {
+              type: Type.OBJECT,
+              properties: {
+                requiredFields: { type: Type.ARRAY, items: { type: Type.STRING } },
+                format: { type: Type.STRING },
+              },
+            },
+            humanReviewPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+            failureHandling: {
+              type: Type.OBJECT,
+              properties: {
+                commonErrors: { type: Type.ARRAY, items: { type: Type.STRING } },
+                correctionSteps: { type: Type.STRING },
+              },
+            },
+            customizationOptions: { type: Type.STRING },
+            expectedOutputExample: { type: Type.STRING },
             aiRole: { type: Type.STRING },
             successIndicator: { type: Type.STRING },
             zapierTemplates: {
@@ -279,7 +401,14 @@ export async function generateAutomationReport(userData: {
               required: ["nodes", "edges"],
             },
           },
-          required: ["name", "description", "skillLevel", "setupTime", "toolsRequired", "limitations", "beginnerSteps", "aiRole", "successIndicator", "zapierTemplates", "diagram"],
+          required: [
+            "name", "description", "skillLevel", "skillLevelExplanation",
+            "setupTimeBreakdown", "toolsRequired", "architecture",
+            "implementationSteps", "promptLogic", "dataStructure",
+            "humanReviewPoints", "failureHandling", "customizationOptions",
+            "expectedOutputExample", "aiRole", "successIndicator", 
+            "zapierTemplates", "diagram"
+          ],
         },
       },
       systemMap: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -312,15 +441,16 @@ export async function generateAutomationReport(userData: {
               type: Type.OBJECT,
               properties: {
                 toolName: { type: Type.STRING },
-                cost: { type: Type.STRING },
+                costTier: { type: Type.STRING, enum: ["Low Cost", "Medium Cost", "High Cost"] },
+                costRange: { type: Type.STRING },
                 reason: { type: Type.STRING },
               },
-              required: ["toolName", "cost", "reason"],
+              required: ["toolName", "costTier", "costRange", "reason"],
             },
           },
-          totalEstimate: { type: Type.STRING },
+          overallCostTier: { type: Type.STRING, enum: ["Low Setup", "Medium Setup", "High Setup"] },
         },
-        required: ["items", "totalEstimate"],
+        required: ["items", "overallCostTier"],
       },
       costVsValue: {
         type: Type.OBJECT,
@@ -343,7 +473,20 @@ export async function generateAutomationReport(userData: {
         config: {
           responseMimeType: "application/json",
           responseSchema: responseSchema,
-          systemInstruction: "You are an AI Workflow Architect. Your role is to help professionals analyze their job, find automation opportunities, and specifically design AI-powered workflows for Zapier. Your tone is professional, beginner-friendly, actionable, and encouraging. You MUST return a valid JSON object matching the requested schema.",
+          systemInstruction: `You are a Senior AI Strategy Consultant & Workflow Architect. Your output is a HIGH-VALUE CLIENT DELIVERABLE meant for high-stakes consulting engagements.
+      
+      TONE & STYLE GUIDELINES:
+      - TONE: Authoritative, strategic, and executive-ready.
+      - VALUE FOCUS: Emphasize "Operational Efficiency", "Strategic Reallocation of Human Capital", and "Sustainable Scalability".
+      - PROFESSIONALISM: Avoid jargon without explanation; provide deep context for every recommendation.
+      
+      CRITICAL REALISM & CONSULTING RULES:
+      1. Decision Clarity > Numerical Precision: Handing a client a decimal-exact ROI can look fake. Use "Strategic Estimates" (e.g., "~12 hours") to maintain credibility.
+      2. Comprehensive Depth: For every workflow, provide a level of detail that a freelancer could follow to implement without further clarification.
+      3. ROI CALCULATION: Strictly follow the salary-based calculation protocol provided in the prompt.
+      4. Payback Period: Always provide as a range (e.g., "~2 – 4 months") to account for implementation friction.
+      5. Physical Industry Nuance: For non-digital roles, focus on "Compliance", "Safety", and "Reduced Error Rates" as much as time saved.
+      6. You MUST return a valid JSON object matching the requested schema.`,
         },
       });
 
