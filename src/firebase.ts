@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase with environment variable for API Key
@@ -95,6 +95,17 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+export async function deleteUserReport(reportId: string) {
+  const path = 'AI_Workflow_Architect';
+  try {
+    await deleteDoc(doc(db, path, reportId));
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${path}/${reportId}`);
+    return false;
+  }
 }
 
 export { collection, addDoc, serverTimestamp, signInWithPopup, onAuthStateChanged };

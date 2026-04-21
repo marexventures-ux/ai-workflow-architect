@@ -170,9 +170,10 @@ export async function generateAutomationReport(userData: {
     
     ROI CALCULATION PROTOCOL (MANDATORY):
     Step 1: Identify "Hours Saved Per Month" by summing the breakdown of 3-5 specific tasks.
-    Step 2: Calculate "Hourly Value" strictly using: 
-       If Monthly Salary provided: Hourly Value = Monthly Salary ÷ 160
-       If Hourly Rate provided: Hourly Value = Hourly Rate
+    Step 2: Calculate "Hourly Value":
+       If Monthly Salary > 0: Hourly Value = Monthly Salary ÷ 160
+       If Hourly Rate > 0: Hourly Value = Hourly Rate
+       Else: Hourly Value = 0 (Do NOT assume a salary if not provided).
     Step 3: Compute "Labor Savings" = Hours Saved × Hourly Value.
     Step 4: Identify "Direct Expenses Savings" (e.g., cutting old software costs) ONLY if applicable.
     Step 5: Compute "Total Monthly Value" = Labor Savings + Direct Expenses Savings.
@@ -185,8 +186,13 @@ export async function generateAutomationReport(userData: {
     Follow this structure:
     1. JOB ANALYSIS: Daily Tasks and Common Tools.
     2. TASK BREAKDOWN: Automatable, AI-Enhanced, and Manual (Human-Centric) tasks.
-    3. AUTOMATION PRIORITY SCORE: Rank tasks based on direct business impact (revenue/lost sales) and ease.
-    4. 🚀 START HERE: Recommend ONLY ONE workflow the user should begin with.
+    3. AUTOMATION PRIORITY SCORE: Provide exactly 3 high-impact tasks. Rank them exactly as follows:
+       - Workflow 1: Highest business impact and ROI.
+       - Workflow 2: Medium business impact/ROI.
+       - Workflow 3: Supporting or base-level impact.
+       These MUST map 1:1 to the 3 Workflows in section 6.
+
+    4. 🚀 START HERE: Recommend ONLY ONE workflow the user should begin with (usually Workflow 1).
     5. ROI ANALYSIS: Numerical estimates strictly derived from the ROI CALCULATION PROTOCOL.
        - estimatedLaborSavings (Number, in ${currency})
        - directExpensesSavings (Number, in ${currency}, default to 0)
@@ -195,8 +201,12 @@ export async function generateAutomationReport(userData: {
        - paybackPeriod (String) - MUST be a range (e.g., "~2.4 – 3.6 weeks").
        - calculationLogic (String) - Explain the math (e.g., "12 hrs saved x ${currency}625/hr labor value").
        - breakdown: A list of 3-5 specific tasks and hours saved for each.
-    6. WORKFLOWS: Create 2-4 COMPLETE IMPLEMENTATION BLUEPRINTS. Do NOT summarize. Provide depth for real-world deployment.
-       For each workflow, include:
+
+    6. WORKFLOWS: Provide exactly 3 COMPLETE IMPLEMENTATION BLUEPRINTS. Do NOT summarize.
+       - Blueprint 1: Maps directly to Workflow 1.
+       - Blueprint 2: Maps directly to Workflow 2.
+       - Blueprint 3: Maps directly to Workflow 3.
+       All three MUST include the following identical sections for consistency:
        - architecture: Map out Trigger -> Input -> Logic -> Output -> Storage.
        - implementationSteps: Detailed, actionable list of setup instructions (no vague advice).
        - promptLogic: A complete, reusable AI prompt with variables (e.g., "[Client_Name]").
@@ -483,8 +493,8 @@ export async function generateAutomationReport(userData: {
       CRITICAL REALISM & CONSULTING RULES:
       1. Decision Clarity > Numerical Precision: Handing a client a decimal-exact ROI can look fake. Use "Strategic Estimates" (e.g., "~12 hours") to maintain credibility.
       2. Comprehensive Depth: For every workflow, provide a level of detail that a freelancer could follow to implement without further clarification.
-      3. ROI CALCULATION: Strictly follow the salary-based calculation protocol provided in the prompt.
-      4. Payback Period: Always provide as a range (e.g., "~2 – 4 months") to account for implementation friction.
+      3. ROI CALCULATION: Strictly follow the salary-based calculation protocol. If no salary or rate is provided (value is 0), set financial savings to 0. Do NOT invent or assume a benchmark salary.
+      4. Payback Period: Always provide as a range (e.g., "~2 – 4 months") based on typical tool costs. If salary is 0, estimate based on time-to-value.
       5. Physical Industry Nuance: For non-digital roles, focus on "Compliance", "Safety", and "Reduced Error Rates" as much as time saved.
       6. You MUST return a valid JSON object matching the requested schema.`,
         },
